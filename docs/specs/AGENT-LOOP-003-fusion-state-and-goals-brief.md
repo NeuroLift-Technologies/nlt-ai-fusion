@@ -132,3 +132,35 @@ F1 is implemented in `src/fusion/agent_loop_memory.py` (`StatefulAgentLoopDecisi
 - **F0, engine side and the `wait` change:** NeuroLift-Technologies/nlt-world-engine#117 (AgentHarness 151/151; not run in-engine).
 - **F1:** implemented earlier on this branch (`src/fusion/agent_loop_memory.py`). It already keys by `agentId`; with F0, only registered ids reach it.
 - **For F5:** in the 2026-10-22 run, after one `look_at plaza`, the wander fallback carried the avatar out of range of everything, and the next 33 decisions were `wait` with nothing visible. That is exactly the case decision 1 covers. What it does not cover (prediction, not measured): once something is back in view, a `wait` holds still again, so a model that keeps choosing `wait` with something in view can still stand still. F3's anti-repeat is the Fusion-side answer.
+
+---
+
+## 9. Headless run and Joshua's follow-up decisions (2026-10-28)
+
+### 9.1 What the headless run showed
+Godot 4.7.2 .NET, headless, in a Claude Code cloud session (no GPU), against `main` of both repos after #132 and nlt-world-engine#117. Frames render under Xvfb with Mesa llvmpipe (Compatibility renderer); screenshots from such runs are software-rendered.
+
+| Check | Result |
+|---|---|
+| F0 roster id end to end | 57/57 perceptions sent as `stay_alert_001`, 57 × HTTP 200, 57 intents accepted |
+| F0 unset id | startup warning; every perception refused (404, named correctly); decision source never called |
+| `wait` with something visible | 0.0 m drift over 27 decisions |
+| Rule-based fallback | `approach plaza` 42/42: the avatar spawns on the plaza, arrives at once, the wander fallback nudges it ~1 m, and the next approach pulls it back |
+| Qwen3-0.6B Q8_0 (before F2) | `look_at` 11/11 (plaza, well, doors) |
+| Qwen3-0.6B Q8_0 with F2 goal + history in the prompt | still `look_at` 11/11, over different targets |
+
+### 9.2 Decisions (Joshua, 2026-10-28)
+- **§5.1 is wrong for current `main`:** doors are in range from the spawn (`door_5_home`, `door_7_shop` in 19 of 42 perceptions, at the 25 m edge). Keep the narrowed-`wait` rule: the dead end still occurs after wandering out of range.
+- **F3:** besides the no-change anti-repeat, also drop `approach X` when the avatar is already within X's arrival radius (use F1's recorded distance to the target).
+- **F4:** the baseline is: approach a door, `use` it, then `sit` / `use` / `rest` inside. Verify acceptance 4a headless in the cloud session; tag software-rendered screenshots as such.
+- **Open items (engine):** Godot hangs on shutdown after the stop signal (find out whether it is the agent-loop driver); rate-limit the missing-agent-id refusal warning, which repeats every 2 s.
+- **Tooling:** add the headless run loop as a documented script (PID files, not `pkill` patterns), as a separate small PR.
+- **Next:** F2.
+
+### 9.3 F2 status
+- `src/fusion/agent_loop_goals.py`: `derive_goal(avatar)` reads the registered Avatar's state without changing it and returns a short goal and one or two needs. Strain (stress ≥ 0.7, burnout risk ≥ 0.6, or a burnout/recovering state) → "recover after stress: find somewhere quiet to rest" (`rest`, `quiet`); cognitive load ≥ 0.7 → a short break (`rest`); otherwise the trait's goal. StayAlert: "start the task you have been putting off: get to your desk and sit down to work" (`focus`).
+- `decision_context` adds the last 4 decisions as `{"did": "look_at plaza", "changed": false}`.
+- Both local model adapters take an optional `context`; it is added to the prompt as `context`, and the system prompt says to serve the goal and not repeat an action that changed nothing. The endpoint gives the GGUF model the goal of the Avatar registered under each perception's `agentId`. The rule-based fallback is unchanged (F4 replaces it).
+- Nothing new reaches Godot: intents still carry only a verb and a target.
+- **Result:** with Qwen3-0.6B the context does not change the choice (§9.1). This is the outcome §6 predicted; F3's structural changes (ordering, anti-repeat, already-there) are the lever.
+- **Gap 2 still holds:** the goal follows the Avatar's state, but nothing in the world loop updates that state yet, so in a world run the goal stays the StayAlert default.

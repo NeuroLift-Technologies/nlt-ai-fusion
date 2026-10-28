@@ -1,0 +1,51 @@
+{
+  "handoff_record": {
+    "session_id": "claude-code-session_01UNjnjkYcUcHARjvG8hyVmE",
+    "agent_name": "Claude (Anthropic) via Claude Code session",
+    "date": "2026-10-28T19:00:00+00:00",
+    "otoi_version": "ORG-DEV-OTOI-1.0.3",
+    "repo": "NeuroLift-Technologies/nlt-ai-fusion",
+    "branch": "ccr-0fc96101-9uxxrc",
+    "work_completed": [
+      "AGENT-LOOP-003 F2: new src/fusion/agent_loop_goals.py. derive_goal(avatar) reads the registered Avatar's state (state machine, stress, burnout risk, cognitive load, trait) without changing it and returns a short goal and one or two needs; decision_context adds the last 4 decisions with whether anything changed; with_goal gives a model decision source the goal of the Avatar registered under the perception's agentId.",
+      "agent_loop_choices.model_input builds the user message for both local adapters (GGUF and Transformers); both take an optional context. SYSTEM_PROMPT gained one sentence on using it.",
+      "agent_loop_http.build_decision_source(registry) wires the GGUF model through with_goal and per-agent memory; create_app passes its registry. The rule-based fallback is unchanged.",
+      "Headless verification in this cloud session: Godot 4.7.2 .NET headless against main of both repos. F0 end to end, F0 fail-closed and wait-holds-still confirmed; the rule-based fallback loops on 'approach plaza'; Qwen3-0.6B chose look_at 11/11 before and after F2. Recorded with Joshua's follow-up decisions in brief §9."
+    ],
+    "work_in_progress": [
+      "F3 (ordering by goal relevance, no-change anti-repeat, drop approach X when already within X's arrival radius), F4 (door -> use -> sit/use/rest baseline; verify 4a headless), F5.",
+      "nlt-world-engine: headless run-loop script (separate small PR); open items: shutdown hang after the stop signal, rate-limit the missing-agent-id warning."
+    ],
+    "blockers": [],
+    "decisions_made": [
+      "Joshua, 2026-10-28 (brief §9.2): §5.1 wrong for current main (doors in range from spawn); F3 also drops approach X when already within X's arrival radius; F4 baseline door -> use -> sit/use/rest, verify 4a headless; engine open items; run-loop script as a separate PR; go on F2.",
+      "derive_goal never calls assess_burnout_risk(), which writes burnout_risk_level; it reads attributes only.",
+      "The goal and history go only into the local model's prompt; intents sent to Godot still carry only verb and target."
+    ],
+    "decisions_pending": [
+      "Thread ID TH-028 is proposed; Joshua assigns.",
+      "Gap 2 (brief §7.3): nothing in the world loop updates Avatar state, so the goal stays the StayAlert default during a world run."
+    ],
+    "escalations": [],
+    "next_agent_notes": "F2 alone does not move Qwen3-0.6B (look_at 11/11 with the goal in the prompt), as brief §6 predicted. F3 should reorder visible entities by goal relevance (doors and desks for the StayAlert goal), drop pairs that changed nothing, and drop approach X when F1's target_distance_before is within the arrival radius (1 m in AvatarCharacter.ApplyIntent). Headless runs: see brief §9.1 for setup; the engine needs NLT_AGENT_LOOP_ENABLED=1 and NLT_AGENT_LOOP_AGENT_ID=stay_alert_001.",
+    "files_modified": [
+      "src/fusion/agent_loop_goals.py",
+      "src/fusion/agent_loop_choices.py",
+      "src/fusion/gguf_agent_decision.py",
+      "src/fusion/transformers_agent_decision.py",
+      "src/fusion/agent_loop_http.py",
+      "tests/test_fusion/test_agent_loop_goals.py",
+      "docs/specs/AGENT-LOOP-003-fusion-state-and-goals-brief.md",
+      "docs/agent-loop-model-adapter.md",
+      "docs/active-threads.md",
+      "docs/agent-log/handoffs/CLAUDE-2026-10-28-agent-loop-f2-goal-handoff.json"
+    ],
+    "tests_run": [
+      "pytest (full suite, CI coverage flags): 502 passed, 2 skipped; total coverage 75.12% (gate 40%).",
+      "pytest tests/test_fusion: 125 passed, 2 skipped (15 new in test_agent_loop_goals.py).",
+      "flake8 (CI settings, max-complexity 10) and mypy on the changed modules: clean. Governance validator 33/33.",
+      "Headless Godot 4.7.2 with Qwen3-0.6B Q8_0 (CPU), 2 min each: before F2 look_at 11/11; with F2 look_at 11/11."
+    ],
+    "tests_passing": true
+  }
+}

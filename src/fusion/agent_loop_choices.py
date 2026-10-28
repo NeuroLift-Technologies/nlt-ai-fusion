@@ -27,8 +27,27 @@ SYSTEM_PROMPT = (
     "approach, use, sit, rest and look_at. Never choose use, sit or rest on an entity marked "
     "occupied. approach walks to it; use operates it, and using a door or an exit goes through "
     "it to another place; sit sits on it; rest rests on it; look_at turns to face it. Never "
-    "output coordinates, movement parameters, or physical state."
+    "output coordinates, movement parameters, or physical state. The input may include context: "
+    "the agent's goal, its needs, and its recent actions with whether anything changed. Choose "
+    "the action that best serves the goal, and do not repeat an action that changed nothing."
 )
+
+
+def model_input(
+    observation: Mapping[str, Any], context: Mapping[str, Any] | None = None
+) -> dict[str, Any]:
+    """The user message both local models receive: the perception, plus the agent's goal, needs
+    and recent actions when a context is given (AGENT-LOOP-003 F2)."""
+    message: dict[str, Any] = {
+        "agentId": observation["agentId"],
+        "tick": observation["tick"],
+        "scene": observation["scene"],
+        "self": observation["self"],
+        "visibleEntities": observation["visibleEntities"],
+    }
+    if context is not None:
+        message["context"] = dict(context)
+    return message
 
 
 def grounded_choices(observation: Mapping[str, Any]) -> dict[str, list[str]]:

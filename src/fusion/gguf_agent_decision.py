@@ -18,6 +18,7 @@ from .agent_loop_choices import (
     SYSTEM_PROMPT,
     decision_schemas,
     grounded_choices,
+    model_input,
     parse_decision,
 )
 
@@ -78,15 +79,14 @@ class LlamaCppAgentLoopDecision:
 
         self._model = model
 
-    def __call__(self, observation: Mapping[str, Any]) -> dict[str, Any]:
+    def __call__(
+        self,
+        observation: Mapping[str, Any],
+        context: Mapping[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Decide one intent. `context` (goal, needs, recent actions) is added to the prompt."""
         validate_perception(observation)
-        model_input = {
-            "agentId": observation["agentId"],
-            "tick": observation["tick"],
-            "scene": observation["scene"],
-            "self": observation["self"],
-            "visibleEntities": observation["visibleEntities"],
-        }
+        message = model_input(observation, context)
         # Constrain generation to the decisions this perception allows: wait, or a verb with a
         # visible target that lists it among its affordances.
         choices = grounded_choices(observation)
@@ -98,7 +98,7 @@ class LlamaCppAgentLoopDecision:
                     {
                         "role": "user",
                         "content": json.dumps(
-                            model_input,
+                            message,
                             separators=(",", ":"),
                             ensure_ascii=False,
                         ),

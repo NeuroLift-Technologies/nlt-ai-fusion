@@ -38,6 +38,7 @@ from .agent_loop import (
     PROTOCOL_VERSION,
     validate_perception,
 )
+from .agent_loop_goals import with_goal
 from .agent_loop_registry import AgentRegistry, build_default_registry
 from .agent_loop_memory import (
     DEFAULT_HISTORY_SIZE,
@@ -77,21 +78,29 @@ def _fallback_decide(observation: Mapping[str, Any]) -> dict[str, Any]:
     }
 
 
-def build_decision_source() -> Callable[[Mapping[str, Any]], Mapping[str, Any]]:
+def build_decision_source(
+    registry: AgentRegistry | None = None,
+) -> Callable[[Mapping[str, Any]], Mapping[str, Any]]:
     """GGUF model when FUSION_GGUF_MODEL is set, else the fallback, with per-agent memory.
 
+    The model is given the goal of the Avatar registered under each perception's agentId and its
+    recent decisions (AGENT-LOOP-003 F2). The fallback ignores both.
     FUSION_AGENT_LOOP_HISTORY sets how many past decisions each agent remembers.
     """
     raw_size = os.environ.get("FUSION_AGENT_LOOP_HISTORY", "").strip()
     history_size = int(raw_size) if raw_size else DEFAULT_HISTORY_SIZE
     model_path = os.environ.get("FUSION_GGUF_MODEL", "").strip()
     if not model_path:
-        source: Callable[[Mapping[str, Any]], Mapping[str, Any]] = _fallback_decide
-    else:
-        from .gguf_agent_decision import LlamaCppAgentLoopDecision
+        return StatefulAgentLoopDecision(
+            ignore_history(_fallback_decide), history_size=history_size
+        )
+    from .gguf_agent_decision import LlamaCppAgentLoopDecision
 
-        source = LlamaCppAgentLoopDecision(model_path)
-    return StatefulAgentLoopDecision(ignore_history(source), history_size=history_size)
+    agents = registry if registry is not None else build_default_registry()
+    return StatefulAgentLoopDecision(
+        with_goal(LlamaCppAgentLoopDecision(model_path), agents),
+        history_size=history_size,
+    )
 
 
 def create_app(
@@ -105,7 +114,7 @@ def create_app(
     """
     agents = registry if registry is not None else build_default_registry()
     app = FastAPI(title="nlt.agent-loop.v1 fusion endpoint", version=PROTOCOL_VERSION)
-    loop = FusionAgentLoop(decide if decide is not None else build_decision_source())
+    loop = FusionAgentLoop(decide if decide is not None else build_decision_source(agents))
 
     in_flight: set[str] = set()
 

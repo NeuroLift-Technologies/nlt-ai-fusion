@@ -13,7 +13,7 @@ from .agent_loop import (
     validate_intent,
     validate_perception,
 )
-from .agent_loop_choices import SYSTEM_PROMPT, grounded_choices, parse_decision
+from .agent_loop_choices import SYSTEM_PROMPT, grounded_choices, model_input, parse_decision
 
 
 class AgentLoopModelOutputError(ValueError):
@@ -80,20 +80,19 @@ class TransformersAgentLoopDecision:
         self._model = model.to(device)
         self._model.eval()
 
-    def __call__(self, observation: Mapping[str, Any]) -> dict[str, Any]:
+    def __call__(
+        self,
+        observation: Mapping[str, Any],
+        context: Mapping[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Decide one intent. `context` (goal, needs, recent actions) is added to the prompt."""
         validate_perception(observation)
-        model_input = {
-            "agentId": observation["agentId"],
-            "tick": observation["tick"],
-            "scene": observation["scene"],
-            "self": observation["self"],
-            "visibleEntities": observation["visibleEntities"],
-        }
+        message = model_input(observation, context)
         messages = [
             {"role": "system", "content": self._SYSTEM_PROMPT},
             {
                 "role": "user",
-                "content": json.dumps(model_input, separators=(",", ":"), ensure_ascii=False),
+                "content": json.dumps(message, separators=(",", ":"), ensure_ascii=False),
             },
         ]
         input_ids = self._tokenizer.apply_chat_template(
