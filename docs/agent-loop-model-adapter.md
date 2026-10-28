@@ -44,9 +44,11 @@ engine's accepted/rejected results do not reach Fusion over this transport, so t
 is the outcome source. The history stays in process memory, is never persisted, and is never sent
 to the engine. A perception whose tick goes backwards (engine restart) clears that agent's history.
 
-The wrapped source receives `(observation, history)`. Stateless sources are adapted with
-`ignore_history`, so the current models and the fallback decide exactly as before; using the
-history is AGENT-LOOP-003 F2/F3 (`docs/specs/AGENT-LOOP-003-fusion-state-and-goals-brief.md`).
+The wrapped source receives `(observation, history)`. With `FUSION_GGUF_MODEL` set, the GGUF
+model gets the recent history (with the agent's goal) in its prompt; see the next section. The
+rule-based fallback is adapted with `ignore_history` and decides as before. Using the history to
+constrain the choice itself is AGENT-LOOP-003 F3
+(`docs/specs/AGENT-LOOP-003-fusion-state-and-goals-brief.md`).
 
 ## Goal and recent history in the prompt
 
