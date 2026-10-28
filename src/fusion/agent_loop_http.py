@@ -36,6 +36,11 @@ from .agent_loop import (
     PROTOCOL_VERSION,
     validate_perception,
 )
+from .agent_loop_memory import (
+    DEFAULT_HISTORY_SIZE,
+    StatefulAgentLoopDecision,
+    ignore_history,
+)
 
 
 def _fallback_decide(observation: Mapping[str, Any]) -> dict[str, Any]:
@@ -70,13 +75,20 @@ def _fallback_decide(observation: Mapping[str, Any]) -> dict[str, Any]:
 
 
 def build_decision_source() -> Callable[[Mapping[str, Any]], Mapping[str, Any]]:
-    """GGUF model when FUSION_GGUF_MODEL is set, else the fallback."""
+    """GGUF model when FUSION_GGUF_MODEL is set, else the fallback, with per-agent memory.
+
+    FUSION_AGENT_LOOP_HISTORY sets how many past decisions each agent remembers.
+    """
+    raw_size = os.environ.get("FUSION_AGENT_LOOP_HISTORY", "").strip()
+    history_size = int(raw_size) if raw_size else DEFAULT_HISTORY_SIZE
     model_path = os.environ.get("FUSION_GGUF_MODEL", "").strip()
     if not model_path:
-        return _fallback_decide
-    from .gguf_agent_decision import LlamaCppAgentLoopDecision
+        source: Callable[[Mapping[str, Any]], Mapping[str, Any]] = _fallback_decide
+    else:
+        from .gguf_agent_decision import LlamaCppAgentLoopDecision
 
-    return LlamaCppAgentLoopDecision(model_path)
+        source = LlamaCppAgentLoopDecision(model_path)
+    return StatefulAgentLoopDecision(ignore_history(source), history_size=history_size)
 
 
 def create_app(

@@ -30,6 +30,12 @@ from .gguf_agent_decision import (
     GgufAgentLoopModelOutputError,
     LlamaCppAgentLoopDecision,
 )
+from .agent_loop_memory import (
+    DecisionOutcome,
+    DecisionRecord,
+    StatefulAgentLoopDecision,
+    ignore_history,
+)
 
 __all__ = [
     "FusionEngine",
@@ -45,6 +51,10 @@ __all__ = [
     "TransformersAgentLoopDecision",
     "GgufAgentLoopModelOutputError",
     "LlamaCppAgentLoopDecision",
+    "DecisionOutcome",
+    "DecisionRecord",
+    "StatefulAgentLoopDecision",
+    "ignore_history",
     # Model-level fusion (trajectory distillation)
     "ModelFusionEngine",
     "ModelFusionReport",

@@ -1,0 +1,56 @@
+{
+  "handoff_record": {
+    "session_id": "claude-code-session_01UNjnjkYcUcHARjvG8hyVmE",
+    "agent_name": "Claude (Anthropic) via Claude Code session",
+    "date": "2026-10-28T17:05:00+00:00",
+    "otoi_version": "ORG-DEV-OTOI-1.0.3",
+    "repo": "NeuroLift-Technologies/nlt-ai-fusion",
+    "branch": "ccr-0fc96101-9uxxrc",
+    "work_completed": [
+      "AGENT-LOOP-003 F1: new src/fusion/agent_loop_memory.py. StatefulAgentLoopDecision wraps a decision source and keeps, per agentId, a bounded history (default 8) of tick, scene id, verb, target and outcome. The wrapped source is called as decide(observation, history); ignore_history adapts stateless sources. It plugs into FusionAgentLoop(decide=...) unchanged. Calls for one agent are serialized (one writer per agent); different agents run concurrently.",
+      "Outcome source verified and recorded (OUTCOME_SOURCE = 'next_perception'): the engine's accepted/rejected results never reach Fusion over the HTTP transport (Fusion has only POST /agent-loop/perception; Godot's FusionHttpLink.cs logs the result locally). Outcome = horizontal movement, scene change, target still visible, distance to target before/after, target taken by someone else. The engine never reports an agent's own anchor as occupied, so its own sit/use is not visible via occupied.",
+      "Edge cases: an intent that fails validation is not remembered; a repeated tick drops the pending decision without an outcome; a tick that goes backwards (engine restart) clears that agent's history.",
+      "agent_loop_http.build_decision_source() now wraps the GGUF or fallback source in StatefulAgentLoopDecision (FUSION_AGENT_LOOP_HISTORY sets the size). Decisions are unchanged: both sources ignore the history until F2/F3.",
+      "The brief is now in the repo at docs/specs/AGENT-LOOP-003-fusion-state-and-goals-brief.md, sections 0-6 verbatim, plus §7, an addendum of facts verified against the code.",
+      "docs/agent-loop-model-adapter.md documents the per-agent memory."
+    ],
+    "work_in_progress": [
+      "F2 (goal from Avatar/Aide), F3 (goal-relevance ordering and anti-repeat using this history), F4 (rule-based goal-driven baseline), F5 (dev-PC re-run of T6 acceptance 4)."
+    ],
+    "blockers": [
+      "F2 needs an avatar binding: nothing in the Fusion endpoint maps perception.agentId to a BaseAvatar instance (brief §7.3 gap 1). Needs Joshua.",
+      "F5 needs brief §5.1 (dead end with nothing in perception range) resolved in the engine."
+    ],
+    "decisions_made": [
+      "Joshua, 2026-10-28: do the addendum (A) and F1 (B).",
+      "Outcomes are derived from the next perception, not engine result messages (not delivered to Fusion today; consistent with contract §4).",
+      "The history lives in process memory only; it is never persisted and never sent to the engine.",
+      "No schema or protocol change; nlt.agent-loop.v1 unchanged."
+    ],
+    "decisions_pending": [
+      "Brief §5.1: how an agent with nothing in range gets unstuck (engine).",
+      "Brief §5.2: whether the F4 rule-based source can count for T6 acceptance 4.",
+      "Brief §7.3: who creates and binds BaseAvatar instances to agentIds in the Fusion endpoint process.",
+      "Thread ID TH-028 is proposed by the brief; Joshua assigns."
+    ],
+    "escalations": [],
+    "next_agent_notes": "For F3, DecisionOutcome.changed is the anti-repeat signal: a look_at with no movement records changed=False, which is the 81-of-84 look_at loop. Give anti-repeat a reset when scene or visible set changes (brief §6). For F2, the goal changes only if something updates avatar state during the world loop (brief §7.3 gap 2).",
+    "files_modified": [
+      "src/fusion/agent_loop_memory.py",
+      "src/fusion/agent_loop_http.py",
+      "src/fusion/__init__.py",
+      "tests/test_fusion/test_agent_loop_memory.py",
+      "docs/specs/AGENT-LOOP-003-fusion-state-and-goals-brief.md",
+      "docs/agent-loop-model-adapter.md",
+      "docs/active-threads.md",
+      "docs/agent-log/registrations/CLAUDE-2026-10-28-agent-loop-memory.json",
+      "docs/agent-log/handoffs/CLAUDE-2026-10-28-agent-loop-memory-handoff.json"
+    ],
+    "tests_run": [
+      "pytest (full suite, CI coverage flags): 479 passed, 2 skipped (the real-model smoke tests); total coverage 74.63% (gate 40%); agent_loop_memory.py 100%.",
+      "pytest tests/test_fusion: 102 passed, 2 skipped (was 82 passed).",
+      "flake8 (CI's settings) on the changed files: clean. mypy on agent_loop_memory.py and agent_loop_http.py: no issues."
+    ],
+    "tests_passing": true
+  }
+}
