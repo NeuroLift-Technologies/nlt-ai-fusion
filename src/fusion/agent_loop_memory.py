@@ -53,9 +53,15 @@ class DecisionOutcome:
     @property
     def changed(self) -> bool:
         """True when the next perception differs in any way this outcome tracks."""
+        target_moved = (
+            self.target_distance_before is not None
+            and self.target_distance_after is not None
+            and abs(self.target_distance_after - self.target_distance_before) >= MOVE_EPSILON
+        )
         return (
             self.scene_changed
             or self.moved_distance >= MOVE_EPSILON
+            or target_moved
             or self.target_taken
             or self.target_visible is False
         )

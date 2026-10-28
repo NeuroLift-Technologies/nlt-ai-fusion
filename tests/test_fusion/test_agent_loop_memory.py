@@ -138,6 +138,29 @@ def test_look_at_that_changes_nothing_is_recorded_as_unchanged():
     assert record.outcome.changed is False
 
 
+def test_target_that_moved_away_counts_as_changed():
+    # Another agent walks off while this one stands still: looking again is not a repeat.
+    def other_agent(x):
+        return {
+            "id": "avatar_2",
+            "kind": "agent",
+            "position": {"x": x, "y": 0.0, "z": 0.0},
+            "affordances": ["communicate", "look_at", "approach"],
+            "occupied": False,
+        }
+
+    source = Scripted(("look_at", "avatar_2"), ("wait", None))
+    decide = StatefulAgentLoopDecision(source)
+
+    decide(perception(tick=1, entities=[other_agent(5.0)]))
+    decide(perception(tick=2, entities=[other_agent(9.0)]))
+
+    outcome = decide.history("avatar_1")[0].outcome
+    assert outcome.moved_distance == 0.0
+    assert outcome.target_distance_after - outcome.target_distance_before == pytest.approx(4.0)
+    assert outcome.changed is True
+
+
 def test_height_change_alone_is_not_movement():
     source = Scripted(("wait", None), ("wait", None))
     decide = StatefulAgentLoopDecision(source)
