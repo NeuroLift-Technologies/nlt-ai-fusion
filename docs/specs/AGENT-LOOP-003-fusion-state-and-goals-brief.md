@@ -129,6 +129,6 @@ F1 is implemented in `src/fusion/agent_loop_memory.py` (`StatefulAgentLoopDecisi
 
 ### 8.1 Status
 - **F0, Fusion side:** `src/fusion/agent_loop_registry.py`. `build_default_registry()` creates the StayAlert pair from `src/avatars/avatar_configs/stay_alert.json` and `src/aides/aide_configs/stay_alert_aide.json` (`stay_alert_001` / `stay_alert_aide_001`), bound through `SessionOrchestrator`. The endpoint answers 404 with no intent for any other `agentId`, before the decision source is called.
-- **F0, engine side and the `wait` change:** world-engine branch `ccr-0fc96101-9uxxrc`.
+- **F0, engine side and the `wait` change:** NeuroLift-Technologies/nlt-world-engine#117 (AgentHarness 151/151; not run in-engine).
 - **F1:** implemented earlier on this branch (`src/fusion/agent_loop_memory.py`). It already keys by `agentId`; with F0, only registered ids reach it.
-- **Risk to check in F5 (prediction, not measured):** in the failed run the avatar chose `look_at` once before freezing, so its perception was not empty. If the plaza perception still lists other agents or non-door objects, decision 1 never fires and the avatar can still stand still on `wait` there. F5 should log `visible=` at the plaza spawn (the engine already prints it per perception).
+- **For F5:** in the 2026-10-22 run, after one `look_at plaza`, the wander fallback carried the avatar out of range of everything, and the next 33 decisions were `wait` with nothing visible. That is exactly the case decision 1 covers. What it does not cover (prediction, not measured): once something is back in view, a `wait` holds still again, so a model that keeps choosing `wait` with something in view can still stand still. F3's anti-repeat is the Fusion-side answer.

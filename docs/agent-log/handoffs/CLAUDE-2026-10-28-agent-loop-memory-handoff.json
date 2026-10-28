@@ -17,7 +17,7 @@
       "Joshua's decisions recorded as brief §8 (narrow wait; split acceptance 4 into 4a/4b; F0 agentId binding; order F0 -> F5)."
     ],
     "work_in_progress": [
-      "World-engine side of F0 (send NLT_AGENT_LOOP_AGENT_ID as the perception agentId) and the narrowed wait: nlt-world-engine branch ccr-0fc96101-9uxxrc.",
+      "World-engine side of F0 (roster agentId from NLT_AGENT_LOOP_AGENT_ID) and the narrowed wait: NeuroLift-Technologies/nlt-world-engine#117.",
       "F2, F3, F4, F5."
     ],
     "blockers": [],
@@ -33,7 +33,7 @@
       "Thread ID TH-028 is proposed by the brief; Joshua assigns."
     ],
     "escalations": [],
-    "next_agent_notes": "For F3, DecisionOutcome.changed is the anti-repeat signal: a look_at with no movement records changed=False, which is the 81-of-84 look_at loop. Give anti-repeat a reset when scene or visible set changes (brief §6). For F2, the goal changes only if something updates avatar state during the world loop (brief §7.3 gap 2). For F2, the decision source gets the avatar via AgentRegistry.get(perception['agentId']); create_app already holds the registry. The goal still changes only if something updates avatar state during the world loop (brief §7.3 gap 2). Brief §8.1 lists a risk for F5: if the plaza perception is not empty, the narrowed wait never fires.",
+    "next_agent_notes": "For F3, DecisionOutcome.changed is the anti-repeat signal: a look_at with no movement records changed=False, which is the 81-of-84 look_at loop. Give anti-repeat a reset when scene or visible set changes (brief §6). For F2, the goal changes only if something updates avatar state during the world loop (brief §7.3 gap 2). For F2, the decision source gets the avatar via AgentRegistry.get(perception['agentId']); create_app already holds the registry. The goal still changes only if something updates avatar state during the world loop (brief §7.3 gap 2). Brief §8.1: the narrowed wait covers the 2026-10-22 stall (33 waits with nothing in view); a model that keeps choosing wait with something in view is F3's to fix.",
     "files_modified": [
       "src/fusion/agent_loop_memory.py",
       "src/fusion/agent_loop_http.py",
