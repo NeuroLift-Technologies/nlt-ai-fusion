@@ -19,6 +19,7 @@ from typing import Any, Callable, Mapping, Sequence
 
 from ..avatars.base_avatar import AvatarState, BaseAvatar
 from .agent_loop_memory import DecisionRecord, DecisionWithHistory
+from .agent_loop_ranking import guide
 from .agent_loop_registry import AgentRegistry
 
 # A goal and the needs behind it.
@@ -94,13 +95,19 @@ def decision_context(
 def with_goal(
     decide: Callable[..., Mapping[str, Any]], registry: AgentRegistry
 ) -> DecisionWithHistory:
-    """Adapt a model decision source that takes `context` to the `(observation, history)` shape,
-    giving it the goal of the Avatar registered under the perception's agentId."""
+    """Adapt a model decision source that takes `context` and `guidance` to the
+    `(observation, history)` shape, giving it the goal of the Avatar registered under the
+    perception's agentId (F2) and, for that goal, the entity ranking and the anti-repeat
+    exclusions (F3)."""
 
     def decide_with_goal(
         observation: Mapping[str, Any], history: Sequence[DecisionRecord]
     ) -> Mapping[str, Any]:
         goal = derive_goal(registry.get(observation["agentId"]).avatar)
-        return decide(observation, context=decision_context(goal, history))
+        return decide(
+            observation,
+            context=decision_context(goal, history),
+            guidance=guide(observation, goal.needs, history),
+        )
 
     return decide_with_goal

@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import uuid
 from pathlib import Path
-from typing import Any, Mapping
+from typing import TYPE_CHECKING, Any, Mapping
 
 from .agent_loop import (
     PROTOCOL_VERSION,
@@ -14,6 +14,9 @@ from .agent_loop import (
     validate_perception,
 )
 from .agent_loop_choices import SYSTEM_PROMPT, grounded_choices, model_input, parse_decision
+
+if TYPE_CHECKING:
+    from .agent_loop_ranking import ChoiceGuidance
 
 
 class AgentLoopModelOutputError(ValueError):
@@ -84,10 +87,12 @@ class TransformersAgentLoopDecision:
         self,
         observation: Mapping[str, Any],
         context: Mapping[str, Any] | None = None,
+        guidance: ChoiceGuidance | None = None,
     ) -> dict[str, Any]:
-        """Decide one intent. `context` (goal, needs, recent actions) is added to the prompt."""
+        """Decide one intent. `context` (goal, needs, recent actions) is added to the prompt;
+        `guidance` orders the entities and leaves out pairs not worth repeating (F3)."""
         validate_perception(observation)
-        message = model_input(observation, context)
+        message = model_input(observation, context, guidance)
         messages = [
             {"role": "system", "content": self._SYSTEM_PROMPT},
             {
@@ -117,7 +122,7 @@ class TransformersAgentLoopDecision:
             skip_special_tokens=True,
         ).strip()
         decision = parse_decision(
-            response, grounded_choices(observation), AgentLoopModelOutputError
+            response, grounded_choices(observation, guidance), AgentLoopModelOutputError
         )
 
         intent: dict[str, Any] = {

@@ -164,3 +164,35 @@ Godot 4.7.2 .NET, headless, in a Claude Code cloud session (no GPU), against `ma
 - Nothing new reaches Godot: intents still carry only a verb and a target.
 - **Result:** with Qwen3-0.6B the context does not change the choice (§9.1). This is the outcome §6 predicted; F3's structural changes (ordering, anti-repeat, already-there) are the lever.
 - **Gap 2 still holds:** the goal follows the Avatar's state, but nothing in the world loop updates that state yet, so in a world run the goal stays the StayAlert default.
+
+## 10. F3: ranking and anti-repeat (2026-10-28)
+
+### 10.1 What changed
+- New `src/fusion/agent_loop_ranking.py`. `guide(observation, needs, history)` returns a `ChoiceGuidance`: entity ids ranked goal-relevant first, then nearest, then engine order; each entity's horizontal distance; which entities are goal-relevant; and the `(verb, target)` pairs the model may not output.
+- **Relevance** matches words in entity ids against the F2 needs (`NEED_KEYWORDS`): `focus` → desk, office, study, whiteboard; `rest` → sofa, bed, home, shore; `quiet` → shore, home, bed. A door counts when its building serves the need (`door_6_office` for StayAlert).
+- **Anti-repeat**, three rules:
+  1. the last pair, when its outcome changed nothing (this brief, F3);
+  2. `approach X` within the 1 m arrival radius (Joshua, §9.2). Measured from the current perception, which is fresher than F1's recorded distance;
+  3. **`look_at X` once X was looked at since entering this scene, within the 8-decision history. This rule is not in the brief; it is an agent addition and needs Joshua's decision (§10.3).** Rule 1 cannot catch a look_at loop: the wander that follows every look always moves the agent, so every look "changed" something.
+  - `wait` is never dropped. Rules 1 and 3 count only decisions made since the agent entered its current scene, so going through a door resets them; an engine restart clears the history (F1).
+- `model_input` lists entities in ranked order with `distance` and `goalRelevant`; `grounded_choices` follows the ranking and leaves out excluded pairs, so the GGUF grammar cannot produce them. Both adapters take an optional `guidance`; `with_goal` supplies it. One sentence added to `SYSTEM_PROMPT`.
+- Unchanged: the rule-based fallback (F4 replaces it), the perception and intent schema, and what reaches Godot (verb and target only).
+
+### 10.2 Measured (headless Godot 4.7.2 .NET, Claude Code cloud session, CPU only)
+Same setup for each run: Fusion `main` plus the change named, Qwen3-0.6B Q8_0, `stay_alert_001`, 240 s, every exchange logged by a pass-through proxy. Every intent was accepted by the engine in every run.
+
+| Fusion source | Decisions | Verb choices | p50 / p95 latency |
+|---|---|---|---|
+| Before F2 (`cb3ed63`) | 51 | `look_at` 51 | 3.24 / 4.94 s |
+| F2 (`0eb0f5a`) | 41 | `look_at` 41 | 4.27 / 6.37 s |
+| F3 rules 1 + 2 + ranking (rule 3 disabled for this run only) | 38 | `look_at` 38 | 4.81 / 6.30 s |
+| **F3 as committed (rules 1–3 + ranking)** | 45 | `wait` 26, `look_at` 17, `approach door_6_office` 2 | 3.87 / 6.49 s |
+
+- The ranking and rules 1–2 alone do not move Qwen off `look_at`.
+- With rule 3, Qwen takes `wait` once everything in view has been looked at. With something in view, `wait` holds still (Joshua, 2026-10-21), so the avatar stands for several decisions. After about five waits, the old looks leave the 8-entry history and `look_at` is offered again.
+- `door_6_office` was ranked first and marked `goalRelevant` throughout. Qwen chose `approach door_6_office` twice and never `use` on it. The goal action did not happen in 45 decisions. **4b is not met.**
+
+### 10.3 Needs Joshua
+1. **Keep rule 3?** It is the only F3 change that moved the model off `look_at`; it is beyond the brief's wording.
+2. **`wait` as the new escape.** F3 drops repeats, and the model falls back to `wait`. Dropping `wait` while a goal-relevant targeted option exists would force a targeted choice. That changes what the model is allowed to say and would partly decide the action for it, so it is not done here.
+3. **Whether the model or the input is the bottleneck** cannot be decided yet: F4 (the rule-based goal-driven baseline) is not started, so 4a has no result. Brief §4 says to choose a larger model only after F4 shows which one it is.

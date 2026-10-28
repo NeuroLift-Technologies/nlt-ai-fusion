@@ -46,9 +46,8 @@ to the engine. A perception whose tick goes backwards (engine restart) clears th
 
 The wrapped source receives `(observation, history)`. With `FUSION_GGUF_MODEL` set, the GGUF
 model gets the recent history (with the agent's goal) in its prompt; see the next section. The
-rule-based fallback is adapted with `ignore_history` and decides as before. Using the history to
-constrain the choice itself is AGENT-LOOP-003 F3
-(`docs/specs/AGENT-LOOP-003-fusion-state-and-goals-brief.md`).
+rule-based fallback is adapted with `ignore_history` and decides as before. The model's choice is
+also constrained by the history (AGENT-LOOP-003 F3); see "Ranking and anti-repeat" below.
 
 ## Goal and recent history in the prompt
 
@@ -57,6 +56,15 @@ With a model configured, each decision's prompt also carries a `context`
 from the state of the Avatar registered under the perception's `agentId`, and the agent's last
 four decisions with whether anything changed after each. The goal is read from the Avatar without
 changing it. Nothing in `context` is sent to the engine. The rule-based fallback ignores it.
+
+## Ranking and anti-repeat
+
+With a model configured, `src/fusion/agent_loop_ranking.py` (AGENT-LOOP-003 F3) also shapes the
+prompt and the output grammar for each decision. Visible entities are listed goal-relevant first,
+then nearest, each with its `distance` in metres and `goalRelevant`. Three kinds of pair are left
+out of what the model may output: the last pair when it changed nothing, `approach X` within the
+1 m arrival radius, and `look_at X` once X was looked at since entering the current scene (within
+the remembered history). `wait` is always allowed. Nothing here is sent to the engine. Measured effect and open decisions: brief §10.
 
 ## Transformers/Safetensors path
 

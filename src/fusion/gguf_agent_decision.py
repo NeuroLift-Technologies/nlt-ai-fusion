@@ -6,7 +6,7 @@ import json
 import threading
 import uuid
 from pathlib import Path
-from typing import Any, Mapping
+from typing import TYPE_CHECKING, Any, Mapping
 
 from .agent_loop import (
     PROTOCOL_VERSION,
@@ -21,6 +21,9 @@ from .agent_loop_choices import (
     model_input,
     parse_decision,
 )
+
+if TYPE_CHECKING:
+    from .agent_loop_ranking import ChoiceGuidance
 
 
 class GgufAgentLoopModelOutputError(ValueError):
@@ -83,13 +86,15 @@ class LlamaCppAgentLoopDecision:
         self,
         observation: Mapping[str, Any],
         context: Mapping[str, Any] | None = None,
+        guidance: ChoiceGuidance | None = None,
     ) -> dict[str, Any]:
-        """Decide one intent. `context` (goal, needs, recent actions) is added to the prompt."""
+        """Decide one intent. `context` (goal, needs, recent actions) is added to the prompt;
+        `guidance` orders the entities and leaves out pairs not worth repeating (F3)."""
         validate_perception(observation)
-        message = model_input(observation, context)
+        message = model_input(observation, context, guidance)
         # Constrain generation to the decisions this perception allows: wait, or a verb with a
         # visible target that lists it among its affordances.
-        choices = grounded_choices(observation)
+        choices = grounded_choices(observation, guidance)
 
         with self._inference_lock:
             response = self._model.create_chat_completion(

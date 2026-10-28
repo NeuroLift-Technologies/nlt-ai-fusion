@@ -10,7 +10,10 @@ the engine already said the target cannot do.
 from __future__ import annotations
 
 import json
-from typing import Any, Mapping
+from typing import TYPE_CHECKING, Any, Mapping
+
+if TYPE_CHECKING:
+    from .agent_loop_ranking import ChoiceGuidance
 
 # Targeted verbs a model may choose. `communicate` is left out: it needs a dialogue payload the
 # v1 contract does not carry yet.
@@ -29,39 +32,71 @@ SYSTEM_PROMPT = (
     "it to another place; sit sits on it; rest rests on it; look_at turns to face it. Never "
     "output coordinates, movement parameters, or physical state. The input may include context: "
     "the agent's goal, its needs, and its recent actions with whether anything changed. Choose "
-    "the action that best serves the goal, and do not repeat an action that changed nothing."
+    "the action that best serves the goal, and do not repeat an action that changed nothing. "
+    "Entities may list their distance in metres and whether they are goalRelevant; they are then "
+    "listed most relevant first."
 )
 
 
+def _ordered_entities(
+    observation: Mapping[str, Any], guidance: ChoiceGuidance | None
+) -> list[Mapping[str, Any]]:
+    entities = list(observation["visibleEntities"])
+    if guidance is None:
+        return entities
+    by_id = {entity["id"]: entity for entity in entities}
+    return [by_id[entity_id] for entity_id in guidance.order if entity_id in by_id]
+
+
 def model_input(
-    observation: Mapping[str, Any], context: Mapping[str, Any] | None = None
+    observation: Mapping[str, Any],
+    context: Mapping[str, Any] | None = None,
+    guidance: ChoiceGuidance | None = None,
 ) -> dict[str, Any]:
     """The user message both local models receive: the perception, plus the agent's goal, needs
-    and recent actions when a context is given (AGENT-LOOP-003 F2)."""
+    and recent actions when a context is given (AGENT-LOOP-003 F2). With `guidance` (F3), entities
+    come most goal-relevant first and each carries its distance and relevance."""
+    entities: list[Mapping[str, Any]] = _ordered_entities(observation, guidance)
+    if guidance is not None:
+        entities = [
+            {
+                **entity,
+                "distance": round(guidance.distances[entity["id"]], 1),
+                "goalRelevant": entity["id"] in guidance.goal_relevant,
+            }
+            for entity in entities
+        ]
     message: dict[str, Any] = {
         "agentId": observation["agentId"],
         "tick": observation["tick"],
         "scene": observation["scene"],
         "self": observation["self"],
-        "visibleEntities": observation["visibleEntities"],
+        "visibleEntities": entities,
     }
     if context is not None:
         message["context"] = dict(context)
     return message
 
 
-def grounded_choices(observation: Mapping[str, Any]) -> dict[str, list[str]]:
-    """Map each targeted verb to the visible entity ids that afford it now, in perception order.
+def grounded_choices(
+    observation: Mapping[str, Any], guidance: ChoiceGuidance | None = None
+) -> dict[str, list[str]]:
+    """Map each targeted verb to the visible entity ids that afford it now.
 
-    Verbs no visible entity affords are omitted. `wait` is always allowed and is not listed.
+    Targets come in perception order, or in `guidance` order with its excluded pairs left out
+    (AGENT-LOOP-003 F3). Verbs with no target left are omitted. `wait` is always allowed and is not
+    listed.
     """
+    excluded = guidance.excluded if guidance is not None else frozenset()
     choices: dict[str, list[str]] = {}
-    for entity in observation["visibleEntities"]:
+    for entity in _ordered_entities(observation, guidance):
         affordances = entity.get("affordances", [])
         for verb in MODEL_TARGET_VERBS:
             if verb not in affordances:
                 continue
             if verb in _OCCUPYING_VERBS and entity.get("occupied") is True:
+                continue
+            if (verb, entity["id"]) in excluded:
                 continue
             choices.setdefault(verb, []).append(entity["id"])
     return choices
