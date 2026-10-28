@@ -6,9 +6,10 @@ from fastapi.testclient import TestClient
 
 from src.fusion.agent_loop import AgentLoopProtocolError
 from src.fusion.agent_loop_http import _fallback_decide, create_app
+from src.fusion.agent_loop_registry import AgentRegistry
 
 
-def _perception(tick: int = 42, agent_id: str = "avatar_1") -> dict:
+def _perception(tick: int = 42, agent_id: str = "stay_alert_001") -> dict:
     return {
         "protocolVersion": "nlt.agent-loop.v1",
         "messageType": "perception",
@@ -37,7 +38,7 @@ def _intent_decide(observation):
     return {
         "protocolVersion": "nlt.agent-loop.v1",
         "messageType": "intent",
-        "messageId": "intent-42-avatar-1",
+        "messageId": "intent-42-stay-alert-001",
         "agentId": observation["agentId"],
         "observedTick": observation["tick"],
         "verb": "approach",
@@ -50,7 +51,7 @@ def test_valid_perception_returns_correlated_intent():
     response = client.post("/agent-loop/perception", json=_perception())
     assert response.status_code == 200
     intent = response.json()
-    assert intent["agentId"] == "avatar_1"
+    assert intent["agentId"] == "stay_alert_001"
     assert intent["observedTick"] == 42
     assert intent["verb"] == "approach"
     assert intent["targetId"] == "desk_1"
@@ -130,3 +131,26 @@ def test_fallback_only_approaches_an_available_target_with_affordance():
     observation["visibleEntities"][0]["affordances"] = ["use", "sit"]
     intent = _fallback_decide(observation)
     assert intent["verb"] == "wait"
+
+
+def test_unregistered_agent_fails_closed_before_any_decision():
+    calls = []
+
+    def recording_decide(observation):
+        calls.append(observation)
+        return _intent_decide(observation)
+
+    client = TestClient(create_app(decide=recording_decide))
+    # The engine's internal key for its local avatar is not a roster id.
+    response = client.post(
+        "/agent-loop/perception", json=_perception(agent_id="__local_avatar__")
+    )
+    assert response.status_code == 404
+    assert response.json()["error"] == "agent is not registered"
+    assert calls == []
+
+
+def test_injected_registry_decides_which_agents_are_served():
+    client = TestClient(create_app(decide=_intent_decide, registry=AgentRegistry()))
+    response = client.post("/agent-loop/perception", json=_perception())
+    assert response.status_code == 404

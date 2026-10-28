@@ -13,6 +13,8 @@ Boundaries (docs/contracts/agent-loop-v1.md):
     responsive while a 0.6B GGUF call takes seconds.
   * One in-flight request per agent (defense in depth — Godot also enforces it
     client-side); duplicates get 429 and Godot fails closed.
+  * Only agents Fusion registered at startup are served (AGENT-LOOP-003 F0); any
+    other agentId gets 404 and no intent. Fusion never creates an avatar on demand.
   * ASFDK governance, live-world validation, and physical execution remain
     Godot's job; this server never claims execution.
 
@@ -36,6 +38,7 @@ from .agent_loop import (
     PROTOCOL_VERSION,
     validate_perception,
 )
+from .agent_loop_registry import AgentRegistry, build_default_registry
 from .agent_loop_memory import (
     DEFAULT_HISTORY_SIZE,
     StatefulAgentLoopDecision,
@@ -93,8 +96,14 @@ def build_decision_source() -> Callable[[Mapping[str, Any]], Mapping[str, Any]]:
 
 def create_app(
     decide: Callable[[Mapping[str, Any]], Mapping[str, Any]] | None = None,
+    registry: AgentRegistry | None = None,
 ) -> FastAPI:
-    """Build the FastAPI app. Tests inject their own decide; production uses env."""
+    """Build the FastAPI app. Tests inject their own decide; production uses env.
+
+    `registry` lists the agents this endpoint decides for; by default the roster pairs from
+    `build_default_registry`.
+    """
+    agents = registry if registry is not None else build_default_registry()
     app = FastAPI(title="nlt.agent-loop.v1 fusion endpoint", version=PROTOCOL_VERSION)
     loop = FusionAgentLoop(decide if decide is not None else build_decision_source())
 
@@ -102,18 +111,9 @@ def create_app(
 
     @app.post("/agent-loop/perception")
     async def perception(request: Request) -> Response:
-        # Parse strictly: an unparsable body is a transport failure, fail closed.
-        try:
-            body = await request.json()
-        except Exception:
-            return _error(400, "perception body is not valid JSON")
-
-        # Envelope check before anything else touches it.
-        try:
-            validate_perception(body)
-        except AgentLoopProtocolError:
-            return _error(422, "invalid perception envelope")
-
+        body = await _read_perception(request, agents)
+        if isinstance(body, Response):
+            return body
         agent_id = body["agentId"]
 
         # One in-flight per agent. Duplicate → 429; Godot treats non-2xx as
@@ -142,6 +142,26 @@ def create_app(
         )
 
     return app
+
+
+async def _read_perception(request: Request, agents: AgentRegistry) -> dict[str, Any] | Response:
+    """The request's perception, or the fail-closed error response for it."""
+    # Parse strictly: an unparsable body is a transport failure, fail closed.
+    try:
+        body = await request.json()
+    except Exception:
+        return _error(400, "perception body is not valid JSON")
+
+    # Envelope check before anything else touches it.
+    try:
+        validate_perception(body)
+    except AgentLoopProtocolError:
+        return _error(422, "invalid perception envelope")
+
+    # Fail closed on an agent Fusion did not register: no avatar is created on demand.
+    if body["agentId"] not in agents:
+        return _error(404, "agent is not registered")
+    return body
 
 
 def _error(status: int, reason: str) -> Response:

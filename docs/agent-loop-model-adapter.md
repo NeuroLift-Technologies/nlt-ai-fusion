@@ -24,6 +24,15 @@ in-flight decision, and synchronous inference runs outside the ASGI event loop. 
 unavailable decisions return a non-success response with no intent. ASFDK governance, live-world
 revalidation, and physical execution remain Godot responsibilities.
 
+## Registered agents
+
+The endpoint decides only for agents Fusion registered at startup (`src/fusion/agent_loop_registry.py`,
+AGENT-LOOP-003 F0). Today that is the StayAlert pair: avatar `stay_alert_001` with Aide
+`stay_alert_aide_001`, bound through `SessionOrchestrator`. A perception for any other `agentId`
+gets 404 and no intent; Fusion never creates an avatar on demand. On the Godot side, set
+`NLT_AGENT_LOOP_AGENT_ID=stay_alert_001` so the engine sends the roster id instead of its internal
+`__local_avatar__` key.
+
 ## Per-agent memory
 
 The endpoint wraps its decision source in `src.fusion.StatefulAgentLoopDecision`

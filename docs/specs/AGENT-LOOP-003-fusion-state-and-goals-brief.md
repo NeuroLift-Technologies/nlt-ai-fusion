@@ -107,3 +107,28 @@ Honest pushback: a 0.6B model may not exploit a goal even with F1–F3. Do not m
 
 ### 7.5 F1 status
 F1 is implemented in `src/fusion/agent_loop_memory.py` (`StatefulAgentLoopDecision`), with the outcome source recorded as `OUTCOME_SOURCE = "next_perception"`. The HTTP endpoint wraps its decision source in it (`FUSION_AGENT_LOOP_HISTORY`, default 8). Decisions are unchanged until F2/F3 use the history.
+
+---
+
+## 8. Joshua's decisions (2026-10-28) — these override §0–§7 where they differ
+
+1. **Dead end (§5.1): narrow `wait`.** In the world engine, `wait` resumes the wander fallback **only when nothing is visible**. When something is visible, `wait` still holds still (the 2026-10-21 decision stands). No `explore` verb, no schema bump.
+2. **Acceptance (§5.2): split T6 acceptance 4.**
+   - **4a:** the engine and the loop behave correctly under a goal-driven Fusion source. The rule-based baseline (F4) may pass this.
+   - **4b:** a model-driven run (Qwen, or the avatar's own RL model). Stays open until a model passes.
+   - Do not mark T6 acceptance 4 met on 4a alone.
+3. **New task F0 (before F1 and F2): agentId binding.** None existed.
+   - Godot sent `agentId` `"__local_avatar__"` (hard-coded in `Main.cs`). Fusion avatars use roster ids like `"stay_alert_001"`. Nothing mapped one to the other.
+   - Fusion creates and owns the Avatar/Aide pairs (`StayAlertAvatar` and its Aide, bound through `SessionOrchestrator`) and keeps an explicit `agentId` → pair registry.
+   - An unknown `agentId` fails closed. Never create an avatar on the fly.
+   - Godot sends the roster id as `agentId`, set by config (`NLT_AGENT_LOOP_AGENT_ID=stay_alert_001`). Only the perception's `agentId` changes; the internal `"__local_avatar__"` key stays.
+   - First pair: StayAlert (the only fully implemented one).
+   - F1 and F2 key their state by this registered `agentId`.
+
+**Order:** F0 → F1 → F2 → F3 → F4 → F5. The engine-side `wait` change is a separate world-engine PR.
+
+### 8.1 Status
+- **F0, Fusion side:** `src/fusion/agent_loop_registry.py`. `build_default_registry()` creates the StayAlert pair from `src/avatars/avatar_configs/stay_alert.json` and `src/aides/aide_configs/stay_alert_aide.json` (`stay_alert_001` / `stay_alert_aide_001`), bound through `SessionOrchestrator`. The endpoint answers 404 with no intent for any other `agentId`, before the decision source is called.
+- **F0, engine side and the `wait` change:** world-engine branch `ccr-0fc96101-9uxxrc`.
+- **F1:** implemented earlier on this branch (`src/fusion/agent_loop_memory.py`). It already keys by `agentId`; with F0, only registered ids reach it.
+- **Risk to check in F5 (prediction, not measured):** in the failed run the avatar chose `look_at` once before freezing, so its perception was not empty. If the plaza perception still lists other agents or non-door objects, decision 1 never fires and the avatar can still stand still on `wait` there. F5 should log `visible=` at the plaza spawn (the engine already prints it per perception).

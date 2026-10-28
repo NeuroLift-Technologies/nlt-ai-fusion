@@ -295,10 +295,12 @@ def test_endpoint_decision_source_remembers_per_agent(monkeypatch):
 
     client = TestClient(create_app(decide=decide))
     for tick in (1, 2, 3):
-        response = client.post("/agent-loop/perception", json=perception(tick=tick))
+        response = client.post(
+            "/agent-loop/perception", json=perception(tick=tick, agent_id="stay_alert_001")
+        )
         assert response.status_code == 200
 
-    history = decide.history("avatar_1")
+    history = decide.history("stay_alert_001")
     assert [record.tick for record in history] == [1, 2]
     # The fallback approaches the first free non-agent entity; memory does not change that yet.
     assert {record.verb for record in history} == {"approach"}
