@@ -24,6 +24,30 @@ in-flight decision, and synchronous inference runs outside the ASGI event loop. 
 unavailable decisions return a non-success response with no intent. ASFDK governance, live-world
 revalidation, and physical execution remain Godot responsibilities.
 
+## Registered agents
+
+The endpoint decides only for agents Fusion registered at startup (`src/fusion/agent_loop_registry.py`,
+AGENT-LOOP-003 F0). Today that is the StayAlert pair: avatar `stay_alert_001` with Aide
+`stay_alert_aide_001`, bound through `SessionOrchestrator`. A perception for any other `agentId`
+gets 404 and no intent; Fusion never creates an avatar on demand. On the Godot side, set
+`NLT_AGENT_LOOP_AGENT_ID=stay_alert_001` so the engine sends the roster id instead of its internal
+`__local_avatar__` key.
+
+## Per-agent memory
+
+The endpoint wraps its decision source in `src.fusion.StatefulAgentLoopDecision`
+(`src/fusion/agent_loop_memory.py`, AGENT-LOOP-003 F1). For each `agentId` it keeps the last
+`FUSION_AGENT_LOOP_HISTORY` decisions (default 8): tick, scene id, verb, target, and the outcome. An
+outcome is what changed by that agent's next perception: horizontal movement, scene change, whether
+the target is still visible, distance to it before and after, and whether someone else took it. The
+engine's accepted/rejected results do not reach Fusion over this transport, so the next perception
+is the outcome source. The history stays in process memory, is never persisted, and is never sent
+to the engine. A perception whose tick goes backwards (engine restart) clears that agent's history.
+
+The wrapped source receives `(observation, history)`. Stateless sources are adapted with
+`ignore_history`, so the current models and the fallback decide exactly as before; using the
+history is AGENT-LOOP-003 F2/F3 (`docs/specs/AGENT-LOOP-003-fusion-state-and-goals-brief.md`).
+
 ## Transformers/Safetensors path
 
 `src.fusion.TransformersAgentLoopDecision` remains available as a separate optional path. The

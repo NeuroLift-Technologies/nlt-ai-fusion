@@ -1,0 +1,22 @@
+{
+  "agent_registration": {
+    "agent_name": "Claude (Anthropic) via Claude Code session",
+    "platform": "Claude Code",
+    "version": "not recorded",
+    "session_id": "claude-code-session_01UNjnjkYcUcHARjvG8hyVmE",
+    "entry_date": "2026-10-28T16:40:00+00:00",
+    "entry_point": "Joshua shared the AGENT-LOOP-003 brief (give the Fusion decision source state, goals and memory) and asked for (A) an addendum of facts verified against the code and (B) task F1, a stateful per-agent decision source.",
+    "acknowledged_otoi": true,
+    "otoi_version": "ORG-DEV-OTOI-1.0.3",
+    "working_repo": "NeuroLift-Technologies/nlt-ai-fusion",
+    "working_branch": "ccr-0fc96101-9uxxrc",
+    "capabilities_self_reported": [
+      "Python and pytest changes to the agent-loop decision sources",
+      "Read-only cross-repo checks against nlt-world-engine (Godot C#) for the nlt.agent-loop.v1 contract"
+    ],
+    "known_limitations": [
+      "No local Qwen model and no Godot runtime here: no in-engine or real-model run; F5 is Joshua's dev-PC run"
+    ],
+    "preferred_handoff_format": "Structured JSON handoff plus the PR description"
+  }
+}
