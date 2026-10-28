@@ -48,6 +48,14 @@ The wrapped source receives `(observation, history)`. Stateless sources are adap
 `ignore_history`, so the current models and the fallback decide exactly as before; using the
 history is AGENT-LOOP-003 F2/F3 (`docs/specs/AGENT-LOOP-003-fusion-state-and-goals-brief.md`).
 
+## Goal and recent history in the prompt
+
+With a model configured, each decision's prompt also carries a `context`
+(`src/fusion/agent_loop_goals.py`, AGENT-LOOP-003 F2): a short goal and one or two needs derived
+from the state of the Avatar registered under the perception's `agentId`, and the agent's last
+four decisions with whether anything changed after each. The goal is read from the Avatar without
+changing it. Nothing in `context` is sent to the engine. The rule-based fallback ignores it.
+
 ## Transformers/Safetensors path
 
 `src.fusion.TransformersAgentLoopDecision` remains available as a separate optional path. The
