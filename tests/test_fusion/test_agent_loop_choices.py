@@ -105,8 +105,26 @@ def test_parse_raises_the_callers_error_type():
         parse_decision("not json", {}, CallerError)
 
 
-def test_prompt_names_every_offered_verb_and_keeps_the_physical_boundary():
+def test_prompt_names_no_verb_and_keeps_the_physical_boundary():
+    # Naming the verbs primes a small model onto look_at (AGENT-LOOP-003 brief §10.4); the output
+    # grammar offers them instead.
     for verb in MODEL_TARGET_VERBS:
-        assert verb in SYSTEM_PROMPT
+        assert verb not in SYSTEM_PROMPT
     assert "Never output coordinates" in SYSTEM_PROMPT
     assert "untrusted" in SYSTEM_PROMPT
+
+
+def test_grammar_still_offers_every_verb_the_prompt_no_longer_names():
+    entity = {
+        "id": "sofa_1",
+        "kind": "object",
+        "position": {"x": 1.0, "y": 0.0, "z": 0.0},
+        "affordances": list(MODEL_TARGET_VERBS),
+        "occupied": False,
+    }
+    observation = {**_observation(), "visibleEntities": [entity]}
+    offered = {
+        schema["properties"]["verb"]["const"]
+        for schema in decision_schemas(grounded_choices(observation))
+    }
+    assert offered == {"wait", *MODEL_TARGET_VERBS}

@@ -66,6 +66,10 @@ out of what the model may output: the last pair when it changed nothing, `approa
 1 m arrival radius, and `look_at X` once X was looked at since entering the current scene (within
 the remembered history). `wait` is always allowed. Nothing here is sent to the engine. Measured effect and open decisions: brief §10.
 
+The system prompt names no verb: naming them primed Qwen3-0.6B onto `look_at` in every case
+measured. With F3 guidance, the model's input carries no coordinates or velocity, only each
+entity's id, kind, distance, relevance, affordances and occupancy (brief §10.4).
+
 ## Transformers/Safetensors path
 
 `src.fusion.TransformersAgentLoopDecision` remains available as a separate optional path. The

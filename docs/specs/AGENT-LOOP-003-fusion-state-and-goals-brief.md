@@ -175,7 +175,7 @@ Godot 4.7.2 .NET, headless, in a Claude Code cloud session (no GPU), against `ma
   2. `approach X` within the 1 m arrival radius (Joshua, §9.2). Measured from the current perception, which is fresher than F1's recorded distance;
   3. **`look_at X` once X was looked at since entering this scene, within the 8-decision history. This rule is not in the brief; it is an agent addition and needs Joshua's decision (§10.3).** Rule 1 cannot catch a look_at loop: the wander that follows every look always moves the agent, so every look "changed" something.
   - `wait` is never dropped. Rules 1 and 3 count only decisions made since the agent entered its current scene, so going through a door resets them; an engine restart clears the history (F1).
-- `model_input` lists entities in ranked order with `distance` and `goalRelevant`; `grounded_choices` follows the ranking and leaves out excluded pairs, so the GGUF grammar cannot produce them. Both adapters take an optional `guidance`; `with_goal` supplies it. One sentence added to `SYSTEM_PROMPT`.
+- `model_input` lists entities in ranked order with `distance` and `goalRelevant`; `grounded_choices` follows the ranking and leaves out excluded pairs, so the GGUF grammar cannot produce them. Both adapters take an optional `guidance`; `with_goal` supplies it. `SYSTEM_PROMPT` was later rewritten (§10.4).
 - Unchanged: the rule-based fallback (F4 replaces it), the perception and intent schema, and what reaches Godot (verb and target only).
 
 ### 10.2 Measured (headless Godot 4.7.2 .NET, Claude Code cloud session, CPU only)
@@ -196,3 +196,21 @@ Same setup for each run: Fusion `main` plus the change named, Qwen3-0.6B Q8_0, `
 1. **Keep rule 3?** It is the only F3 change that moved the model off `look_at`; it is beyond the brief's wording.
 2. **`wait` as the new escape.** F3 drops repeats, and the model falls back to `wait`. Dropping `wait` while a goal-relevant targeted option exists would force a targeted choice. That changes what the model is allowed to say and would partly decide the action for it, so it is not done here.
 3. **Whether the model or the input is the bottleneck** cannot be decided yet: F4 (the rule-based goal-driven baseline) is not started, so 4a has no result. Brief §4 says to choose a larger model only after F4 shows which one it is.
+
+### 10.4 System prompt: name no verbs; trimmed model input (2026-10-28)
+- **Offline, 20 real perceptions from the engine runs** (19 with a goal-relevant entity in view), F3 ranking and grammar, no history:
+
+| Prompt and input | Qwen chose | Goal-directed |
+|---|---|---|
+| Previous prompt (names the verbs), full or trimmed input | `look_at` 20/20 | 0/20 |
+| Step-by-step directive that names `look_at` ("only as a last resort"), full or trimmed | `look_at` 20/20 | 0/20 |
+| Any prompt that names no verb (three wordings, full or trimmed input) | `use` on the goal-relevant door 19/20 | 19/20 |
+
+  Naming the verbs is what primes `look_at`. Trimming coordinates does not change the choice; it halves decision time (about 2.2 s to 1.1 s).
+- **Committed:** `SYSTEM_PROMPT` names no verb (the output grammar still offers every verb), and with F3 guidance the model input leaves out coordinates and velocity.
+- **In-engine (240 s, same setup as §10.2): `use well` 67, `use plaza` 22, p50 1.76 s / p95 3.25 s.** From the spawn only `plaza` and `well` are in range, nothing goal-relevant ever came into view, and Qwen takes the first-listed entity, so `use` kept the avatar shuttling between well and plaza. The office door was never perceived. Under the previous prompt, `look_at` handed the avatar to the wander fallback, which carried it into door range: the `look_at` loop was the avatar's only exploration.
+- **Reading:** the model is following list order, not reasoning about the goal: it acts on the first entity it is shown. F3's ranking makes that useful when a goal-relevant entity is visible; it cannot help when none is. Offline sampling from wandering runs missed the spawn case.
+- **Needs Joshua:**
+  1. Keep the new prompt? It is faster and goal-directed when the goal is in view, and it stalls the avatar at the spawn when the goal is not.
+  2. How the agent explores when nothing goal-relevant is in view. Fusion has no verb for it (no `explore` verb, §8 decision 1). Options: in Fusion, offer only non-holding choices (`look_at`, `approach`) when nothing goal-relevant is visible, so the engine's wander resumes; or in the engine, a spawn or perception range that keeps a goal-relevant door in view (§5.1 option b).
+  3. F4 faces the same question: its baseline starts with "approach a door", and from the spawn no office door is in range.

@@ -112,7 +112,8 @@ def test_model_input_lists_ranked_entities_with_distance_and_relevance():
         "door_2_shop",
     ]
     assert first["distance"] == 20.0 and first["goalRelevant"] is True
-    # The perception itself is not modified.
+    # No coordinates or velocity reach the model, and the perception itself is not modified.
+    assert "self" not in message and "position" not in first
     assert "distance" not in observation["visibleEntities"][0]
 
 
