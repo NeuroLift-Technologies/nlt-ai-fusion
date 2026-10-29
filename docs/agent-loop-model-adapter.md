@@ -17,9 +17,21 @@ python -m src.fusion.agent_loop_http
 ```
 
 The endpoint listens on `127.0.0.1:8001`; its route is `POST /agent-loop/perception`. Set
-`FUSION_AGENT_LOOP_PORT` to change the local port. Set `FUSION_GGUF_MODEL` to a local GGUF path to
-select llama.cpp inference; otherwise the endpoint uses a deterministic, model-free control
-decision. Perceptions and returned intents are validated, each avatar is limited to one
+`FUSION_AGENT_LOOP_PORT` to change the local port. `FUSION_AGENT_LOOP_MODEL` selects the decision
+source: `baseline` (the deterministic, model-free goal baseline), `gguf` (llama.cpp, model path in
+`FUSION_GGUF_MODEL`) or `transformers` (model directory in `FUSION_TRANSFORMERS_MODEL`). Unset, it
+is `gguf` when `FUSION_GGUF_MODEL` is set and `baseline` otherwise. An unknown value, or a model
+that is selected but cannot be loaded, stops the endpoint at startup.
+
+Each decision may take at most `FUSION_AGENT_LOOP_TIMEOUT` seconds (default 15; it must be above
+0 and below Godot's own 30 s wait). A decision that takes longer gets 503, and the model is
+quarantined: every new request, for any agent, gets 503 at once, without starting a new inference,
+until the stuck call returns or the process restarts. A request already waiting for the model when it
+was quarantined gets 503 if its own time runs out first, and then never starts inference; one still
+within its time when the stuck call returns goes ahead, since the model is free again. The timed-out
+decision is abandoned: its result is discarded and it is not remembered, since Godot never received
+an intent for it. Decisions
+on one model instance run one at a time. Perceptions and returned intents are validated, each avatar is limited to one
 in-flight decision, and synchronous inference runs outside the ASGI event loop. Invalid, stale, or
 unavailable decisions return a non-success response with no intent. ASFDK governance, live-world
 revalidation, and physical execution remain Godot responsibilities.
