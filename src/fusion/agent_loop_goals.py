@@ -14,6 +14,7 @@ recorded as an open gap (brief §7.3), not worked around here.
 
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass
 from typing import Any, Callable, Mapping, Sequence
 
@@ -55,6 +56,10 @@ _STRAINED_STATES = frozenset(
 
 # How many past decisions the prompt shows, newest last.
 RECENT_WINDOW = 4
+
+# Expected model decision time, in seconds, before an agent's first decision has been timed.
+# Measured with Qwen3-0.6B on CPU: p50 about 3 s, p95 about 5.5 s.
+DEFAULT_DECISION_SECONDS = 5.0
 
 
 @dataclass(frozen=True)
@@ -100,14 +105,24 @@ def with_goal(
     perception's agentId (F2) and, for that goal, the entity ranking and the anti-repeat
     exclusions (F3)."""
 
+    # How long each agent's last decision took, for the reach guard (F3). A model call takes
+    # seconds, during which a walking avatar keeps moving.
+    last_seconds: dict[str, float] = {}
+
     def decide_with_goal(
         observation: Mapping[str, Any], history: Sequence[DecisionRecord]
     ) -> Mapping[str, Any]:
-        goal = derive_goal(registry.get(observation["agentId"]).avatar)
-        return decide(
-            observation,
-            context=decision_context(goal, history),
-            guidance=guide(observation, goal.needs, history),
-        )
+        agent_id = observation["agentId"]
+        goal = derive_goal(registry.get(agent_id).avatar)
+        latency = last_seconds.get(agent_id, DEFAULT_DECISION_SECONDS)
+        started = time.monotonic()
+        try:
+            return decide(
+                observation,
+                context=decision_context(goal, history),
+                guidance=guide(observation, goal.needs, history, latency),
+            )
+        finally:
+            last_seconds[agent_id] = time.monotonic() - started
 
     return decide_with_goal
