@@ -1,6 +1,7 @@
 """Tests for goal-relevance ranking and anti-repeat in the agent loop (AGENT-LOOP-003 F3)."""
 
 import json
+from dataclasses import replace
 
 import pytest
 
@@ -335,20 +336,63 @@ def test_only_holding_verbs_are_exempt(verb):
     assert (verb, "desk_1") in guide(perception(view, scene="office_1"), FOCUS, history).excluded
 
 
-def test_third_tier_puts_acting_verbs_before_visited_approaches_and_look_at_last():
+def test_third_tier_puts_approaches_before_holding_verbs_and_look_at_last():
     view = [entity("well", 6.0), entity("plaza", 3.0), entity("door_1_office", 20.0)]
     history = (record("approach", "well", changed=True), record("approach", "plaza", changed=True))
     options = guide(perception(view, x=0.0), FOCUS, history).options
     assert options[:2] == (("use", "door_1_office"), ("approach", "door_1_office"))
     assert options[2:] == (
-        ("use", "plaza"),
-        ("use", "well"),
         ("approach", "plaza"),
         ("approach", "well"),
+        ("use", "plaza"),
+        ("use", "well"),
         ("look_at", "door_1_office"),
         ("look_at", "plaza"),
         ("look_at", "well"),
     )
+
+
+def test_visited_targets_are_approached_least_recently_visited_first_then_farthest():
+    view = [entity("plaza", 3.0), entity("well", 6.0), entity("door_2_shop", 9.0)]
+    history = (
+        record("approach", "plaza", changed=True),
+        record("approach", "door_2_shop", changed=True),
+        record("approach", "well", changed=True),
+        record("look_at", "well", changed=False),
+    )
+    options = guide(perception(view), FOCUS, history).options
+    approaches = [target for verb, target in options if verb == "approach"]
+    assert approaches == ["plaza", "door_2_shop", "well"]
+    history = (
+        record("use", "plaza", changed=True),
+        record("use", "well", changed=True),
+        record("look_at", "well", changed=False),
+    )
+    # Visited equally long ago: none of these approaches was chosen, so the most recent visit
+    # decides, then distance.
+    options = guide(perception(view), FOCUS, history).options
+    assert options[0] == ("approach", "door_2_shop")
+
+
+def test_alternating_between_two_holding_pairs_is_broken_up():
+    # The use well / use plaza loop from the #135 engine run: neither use moved the agent.
+    view = [entity("well", 6.0), entity("plaza", 8.0), entity("bench", 4.0)]
+    history = (record("use", "well"), record("use", "plaza"))
+    options = guide(perception(view), FOCUS, history).options
+    holding = [pair for pair in options if pair[0] == "use"]
+    # use plaza was the last pair and changed nothing (rule 1); use well was chosen before and
+    # now ranks below the bench, which was not, and below every approach.
+    assert holding == [("use", "bench"), ("use", "well")]
+    assert all(options.index(("use", "well")) > options.index(pair)
+               for pair in options if pair[0] == "approach")
+
+
+def test_holding_pairs_on_targets_that_do_not_serve_the_goal_stay_allowed():
+    view = [entity("well", 0.5), entity("plaza", 6.0)]
+    history = (record("approach", "plaza", changed=True), record("approach", "well", changed=True))
+    options = guide(perception(view), FOCUS, history).options
+    assert ("use", "well") in options and ("use", "plaza") in options
+    assert options[0] == ("approach", "plaza")
 
 
 def test_a_visited_goal_target_that_only_affords_approach_does_not_ping_pong():
@@ -406,17 +450,23 @@ def test_input_lists_at_most_the_best_options_while_the_grammar_offers_all():
     assert len(fake.options(0)) == 30 + 1
 
 
-def test_with_no_goal_in_view_only_approaches_are_offered_farthest_unvisited_first():
+def test_with_no_goal_in_view_approaches_come_first_farthest_unvisited_first():
     observation = perception(
         [entity("plaza", 3.0), entity("well", 8.0), entity("door_2_shop", 20.0)]
     )
     guidance = guide(observation, FOCUS, (record("approach", "door_2_shop", changed=True),))
-    assert guidance.options == (
+    assert guidance.options[:3] == (
         ("approach", "well"),
         ("approach", "plaza"),
         ("approach", "door_2_shop"),
     )
-    assert ("use", "well") in guidance.excluded and ("look_at", "plaza") in guidance.excluded
+    # Demoted, not forbidden (Josh, 2026-10-28).
+    assert guidance.options[3:6] == (
+        ("use", "plaza"),
+        ("use", "well"),
+        ("use", "door_2_shop"),
+    )
+    assert ("use", "well") not in guidance.excluded and ("look_at", "plaza") in guidance.options
 
 
 def test_at_the_spawn_exploring_walks_to_the_other_landmark_instead_of_using_one():
@@ -424,7 +474,7 @@ def test_at_the_spawn_exploring_walks_to_the_other_landmark_instead_of_using_one
     # which is what brings the shop and office doors into view in the engine.
     observation = perception([entity("plaza", 6.0), entity("well", 0.5)])
     history = (record("approach", "plaza", changed=True), record("approach", "well", changed=True))
-    assert guide(observation, FOCUS, history).options == (("approach", "plaza"),)
+    assert guide(observation, FOCUS, history).options[0] == ("approach", "plaza")
 
 
 def test_exploring_ends_as_soon_as_something_goal_relevant_is_in_view():
@@ -479,7 +529,7 @@ def test_a_target_that_moved_while_the_agent_stood_still_is_not_a_walk_under_way
     assert moved_target.outcome.changed
     observation = perception([entity("plaza", 4.0), entity("well", 9.0)])
     history = (record("approach", "well", changed=True), moved_target)
-    # Without a walk under way, the farther visited target comes first.
+    # Without a walk under way, the least recently visited target comes first.
     assert guide(observation, FOCUS, history).options[0] == ("approach", "well")
 
 
@@ -530,7 +580,8 @@ def test_a_goal_out_of_reach_does_not_stop_the_agent_exploring():
         -1.4,
     )
     options = guide(observation, FOCUS, (), latency_seconds=7.0).options
-    assert options and all(verb == "approach" for verb, _ in options)
+    assert options[:2] == (("approach", "plaza"), ("approach", "well"))
+    assert not any(target == "door_1_office" for _, target in options)
 
 
 def test_an_approach_that_made_no_progress_blocks_the_target():
@@ -546,8 +597,34 @@ def test_an_approach_that_got_closer_or_arrived_does_not_block():
     observation = perception([entity("door_4_home", 3.0), entity("well", 12.0)])
     for before, after in ((7.6, 3.0), (2.0, 0.5)):
         history = (approach_record("door_4_home", before=before, after=after),)
-        # Nothing goal-relevant is in view, so exploring already leaves out `use`; check approach.
         assert ("approach", "door_4_home") not in guide(observation, FOCUS, history).excluded
+
+
+def use_record(target, before, after):
+    return replace(approach_record(target, before, after), verb="use")
+
+
+def test_a_use_that_left_the_agent_short_of_the_target_blocks_it():
+    # Measured with Qwen: `use door_4_home` chosen 9 times while the agent stood 7.61 m away.
+    observation = perception([entity("door_4_home", 7.6), entity("well", 12.0)])
+    guidance = guide(observation, FOCUS, (use_record("door_4_home", before=7.61, after=7.61),))
+    assert ("use", "door_4_home") in guidance.excluded
+
+
+def test_using_a_target_from_within_the_hold_radius_does_not_block_it():
+    observation = perception([entity("well", 1.2)])
+    guidance = guide(observation, FOCUS, (use_record("well", before=1.2, after=1.2),))
+    assert ("use", "well") not in guidance.excluded
+
+
+def test_an_approach_after_which_the_agent_ended_up_farther_away_does_not_block():
+    # Measured at the spawn with Qwen: the wander after `look_at plaza` carried the agent from
+    # 4.6 m to 5.2 m of the plaza while `approach plaza` was being decided.
+    observation = perception([entity("plaza", 2.5), entity("well", 5.7)])
+    history = (approach_record("plaza", before=4.6, after=5.2),)
+    guidance = guide(observation, FOCUS, history)
+    assert ("approach", "plaza") not in guidance.excluded
+    assert ("use", "plaza") not in guidance.excluded
 
 
 def test_a_blocked_target_is_retried_after_going_through_a_door():
