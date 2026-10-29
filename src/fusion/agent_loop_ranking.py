@@ -8,8 +8,8 @@ change that (F2 measured it), so the bias is removed structurally:
 - **Anti-repeat.** Some (verb, target) pairs are dropped from what the model may output, because
   repeating them cannot produce anything new:
   1. the pair chosen last, when its outcome changed nothing (brief F3). Except sitting on, resting
-     on or using a goal-relevant target the agent is already at: holding still there is the goal
-     reached, not a stall, and the engine treats the repeat as a no-op (AvatarCharacter
+     on or using a goal-relevant target the agent is still at (`HOLD_RADIUS`): holding still is
+     the goal reached, not a stall, and the engine treats the repeat as a no-op (AvatarCharacter
      ApplyInteraction). Without this the agent leaves its desk chair for the next one. A door or
      exit is not exempt: using it is a transition, and one that changed nothing has failed;
   2. `approach X` when the agent already stands within X's arrival radius (Joshua, 2026-10-28,
@@ -36,6 +36,17 @@ change that (F2 measured it), so the bias is removed structurally:
   `use`, `sit`, `rest` and `look_at` on targets that do not serve the goal are left out, so the
   agent cannot park beside one. No new verb and no reliance on the engine's wander: every move
   is a targeted `approach`.
+- **Reach guard.** The engine refuses any intent whose target is beyond 30 m of the avatar's live
+  position when it executes (IntentIngress.RecheckTarget), while perception lists entities out to
+  25 m. A walking avatar keeps moving while the decision is made, so a target perceived at 24 m
+  can be 31 m away at execution (measured: 24.1 m, 1.4 m/s, a 7 s decision). Pairs whose target
+  would be out of reach at the position predicted from the avatar's velocity and the expected
+  decision time are left out. A goal-relevant target that is out of reach does not stop the agent
+  exploring.
+- **Blocked targets.** An approach that made no progress toward a target the agent is still
+  beyond the arrival radius of means the target cannot be reached from here (measured: the agent
+  stopped 7.6 m short of a raised doorway). Every pair on that target except `look_at` is left out
+  for the rest of the scene, within the remembered history.
 
 `wait` is never dropped, so a model always has something to choose. Exclusions are computed from
 the current perception and the F1 history only; history is cleared when the engine restarts, and
@@ -56,6 +67,18 @@ from .agent_loop_memory import MOVE_EPSILON, DecisionRecord
 
 # The engine's arrival radius for a targeted move, in metres (AvatarCharacter.ApplyIntent).
 ARRIVAL_RADIUS = 1.0
+
+# How close an agent must be to a target it sits on, rests on or uses to count as still holding
+# it. Wider than the arrival radius: a seated avatar drifts a little, and at 1.0 m exactly the
+# exemption from rule 1 lapsed after 70 decisions and the agent moved to the next chair.
+HOLD_RADIUS = 1.5
+
+# The engine's reach for any targeted intent, in metres, from the avatar's live position at
+# execution (IntentIngress.RecheckTarget).
+REACH_RADIUS = 30.0
+
+# Verbs that need the agent to get to the target.
+_REACHING_VERBS = ("approach", "use", "sit", "rest")
 
 # Words in an entity id that serve a need. Ids are readable slugs from the engine: doors are
 # `door_<n>_<office|shop|school|home>`, furniture is `<label>_<n>` (`desk_1`, `desk_chair_2`,
@@ -210,14 +233,24 @@ def walk_under_way(
     return None
 
 
+def reachable_relevant(
+    choices: Mapping[str, Sequence[str]], goal_relevant: frozenset[str]
+) -> frozenset[str]:
+    """Goal-relevant targets with at least one allowed pair left."""
+    return frozenset(
+        target for targets in choices.values() for target in targets if target in goal_relevant
+    )
+
+
 def exploring_exclusions(
     observation: Mapping[str, Any], guidance: ChoiceGuidance
 ) -> frozenset[tuple[str, str]]:
-    """With nothing goal-relevant in view, every allowed pair except `approach`, if some approach
-    is allowed; else nothing. Leaving these out is what makes the agent explore."""
-    if guidance.goal_relevant:
-        return frozenset()
+    """With nothing goal-relevant in view that the agent can still act on, every allowed pair
+    except `approach`, if some approach is allowed; else nothing. Leaving these out is what makes
+    the agent explore."""
     choices = grounded_choices(observation, guidance)
+    if reachable_relevant(choices, guidance.goal_relevant):
+        return frozenset()
     if not choices.get("approach"):
         return frozenset()
     return frozenset(
@@ -225,6 +258,37 @@ def exploring_exclusions(
         for verb, targets in choices.items()
         if verb != "approach"
         for target in targets
+    )
+
+
+def _blocked(record: DecisionRecord) -> bool:
+    """True when an approach brought the agent no closer to a target it had not reached."""
+    outcome = record.outcome
+    if record.verb != "approach":
+        return False
+    before, after = outcome.target_distance_before, outcome.target_distance_after
+    if before is None or after is None:
+        return False
+    return after > ARRIVAL_RADIUS and before - after < MOVE_EPSILON
+
+
+def out_of_reach_pairs(
+    observation: Mapping[str, Any], latency_seconds: float
+) -> frozenset[tuple[str, str]]:
+    """Pairs whose target will be beyond the engine's reach where the avatar is predicted to be
+    when the intent executes: its position moved along its current velocity for
+    `latency_seconds`."""
+    position = observation["self"]["position"]
+    velocity = observation["self"]["velocity"]
+    predicted = {
+        "x": position["x"] + velocity["x"] * latency_seconds,
+        "z": position["z"] + velocity["z"] * latency_seconds,
+    }
+    return frozenset(
+        (verb, entity["id"])
+        for entity in observation["visibleEntities"]
+        if _horizontal_distance(predicted, entity["position"]) > REACH_RADIUS
+        for verb in (*_REACHING_VERBS, "look_at")
     )
 
 
@@ -244,13 +308,15 @@ def excluded_pairs(
             and last.target_id is not None
             and not last.target_id.startswith(_PORTAL_PREFIXES)
             and last.target_id in goal_relevant
-            and distances.get(last.target_id, ARRIVAL_RADIUS + 1) <= ARRIVAL_RADIUS
+            and distances.get(last.target_id, HOLD_RADIUS + 1) <= HOLD_RADIUS
         )
         if last.target_id is not None and not last.outcome.changed and not holding_goal:
             excluded.add((last.verb, last.target_id))
     for record in since_entry:
         if record.verb == "look_at" and record.target_id is not None:
             excluded.add(("look_at", record.target_id))
+        if record.target_id is not None and _blocked(record):
+            excluded.update((verb, record.target_id) for verb in _REACHING_VERBS)
 
     for entity_id, distance in distances.items():
         if distance <= ARRIVAL_RADIUS:
@@ -262,9 +328,11 @@ def guide(
     observation: Mapping[str, Any],
     needs: Sequence[str],
     history: Sequence[DecisionRecord],
+    latency_seconds: float = 0.0,
 ) -> ChoiceGuidance:
     """Rank one perception's entities for the goal's `needs` and work out what the model may not
-    repeat."""
+    repeat. `latency_seconds` is how long the decision is expected to take; the reach guard
+    predicts the avatar's position that far ahead."""
     position = observation["self"]["position"]
     entities = list(observation["visibleEntities"])
     distances = {
@@ -281,16 +349,18 @@ def guide(
         order=tuple(entity["id"] for _, entity in ranked),
         distances=distances,
         goal_relevant=relevant,
-        excluded=excluded_pairs(observation, history, distances, relevant),
+        excluded=excluded_pairs(observation, history, distances, relevant)
+        | out_of_reach_pairs(observation, latency_seconds),
         options=(),
     )
     guidance = replace(
         guidance, excluded=guidance.excluded | exploring_exclusions(observation, guidance)
     )
+    choices = grounded_choices(observation, guidance)
     options = rank_options(
-        grounded_choices(observation, guidance),
+        choices,
         guidance.order,
-        relevant,
+        reachable_relevant(choices, relevant),
         visited_targets(observation, history),
         needs,
         distances,
