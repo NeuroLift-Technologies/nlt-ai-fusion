@@ -1,0 +1,54 @@
+{
+  "handoff_record": {
+    "session_id": "claude-code-session_01UNjnjnVoMiD4yeZEmiqfMa",
+    "agent_name": "Claude (Anthropic) via Claude Code session",
+    "date": "2026-10-28T23:59:00+00:00",
+    "otoi_version": "ORG-DEV-OTOI-1.0.3",
+    "repo": "NeuroLift-Technologies/nlt-ai-fusion",
+    "branch": "ccr-100a7dbc-intpwq",
+    "work_completed": [
+      "AGENT-LOOP-003 F3: new src/fusion/agent_loop_ranking.py. guide(observation, needs, history) ranks visible entities goal-relevant first, then nearest, then engine order, and computes the (verb, target) pairs the model may not output: the last pair when it changed nothing; approach X within the 1 m arrival radius; look_at X once X was looked at since entering the current scene (within the 8-decision history). wait is never dropped.",
+      "agent_loop_choices: model_input lists ranked entities with distance and goalRelevant; grounded_choices follows the ranking and leaves out excluded pairs, so the GGUF grammar cannot produce them. Both local adapters take an optional guidance; with_goal supplies it. One sentence added to SYSTEM_PROMPT.",
+      "Headless benchmark (Godot 4.7.2 .NET, Qwen3-0.6B Q8_0, 240 s per run): before F2 look_at 51/51; F2 look_at 41/41; F3 without rule 3 look_at 38/38; F3 as committed wait 26, look_at 17, approach door_6_office 2. Never use on the goal-relevant office door. Recorded in brief §10.",
+      "System prompt rewritten to name no verb (naming them primed look_at 20/20 offline; no-verb prompts chose use on the goal-relevant door 19/20); model input drops coordinates when F3 guidance is present. In-engine: use well 67, use plaza 22, p50 1.76 s: from the spawn nothing goal-relevant is in range and the avatar shuttles between well and plaza (brief §10.4)."
+    ],
+    "work_in_progress": [
+      "F4 (rule-based goal-driven baseline: approach a door, use it, then sit/use/rest inside; verify acceptance 4a headless), F5.",
+      "nlt-world-engine docs fix, bundled into a later PR by Joshua's instruction: headless-loop.md SIGINT note (measured here: SIGINT stops Godot in 0.1-1 s, SIGTERM does not) and the AgentHarness count 151 -> 155."
+    ],
+    "blockers": [],
+    "decisions_made": [
+      "Excluded pairs are removed from the output grammar, not only described in the prompt (brief §7.1: the bias is structural).",
+      "Already-there uses the distance in the current perception rather than F1's recorded distance: it is the fresher fact.",
+      "Rules 1 and 3 count only decisions since the agent entered its current scene, so going through a door resets them (brief §6 risk: anti-repeat wedging an agent)."
+    ],
+    "decisions_pending": [
+      "Rule 3 (no repeated look_at in a scene) is beyond the brief's wording; Joshua decides whether it stays (brief §10.3).",
+      "With repeats dropped the model falls back to wait; whether to drop wait while a goal-relevant targeted option exists (brief §10.3).",
+      "Model vs input as the bottleneck: undecidable until F4 gives a 4a result.",
+      "Keep the no-verb prompt, and how the agent explores when nothing goal-relevant is in view (brief §10.4)."
+    ],
+    "escalations": [],
+    "next_agent_notes": "F3 moves Qwen3-0.6B off look_at only through rule 3, and then onto wait, not onto the goal (use door_6_office). Start F4 next: it is the control that tells whether the input (F1-F3) is sufficient. Headless setup: Godot 4.7.2 .NET (mono) build, .NET 8 SDK, asfdk-csharp beside nlt-world-engine, nlt-world-engine tools/headless-loop.sh. Running the Fusion test suite leaves data/models/avatar_1.json and avatar_2.json untracked in the repo; some test writes into the real data folder.",
+    "files_modified": [
+      "src/fusion/agent_loop_ranking.py",
+      "src/fusion/agent_loop_choices.py",
+      "src/fusion/agent_loop_goals.py",
+      "src/fusion/gguf_agent_decision.py",
+      "src/fusion/transformers_agent_decision.py",
+      "tests/test_fusion/test_agent_loop_ranking.py",
+      "tests/test_fusion/test_agent_loop_goals.py",
+      "docs/specs/AGENT-LOOP-003-fusion-state-and-goals-brief.md",
+      "docs/agent-loop-model-adapter.md",
+      "docs/active-threads.md",
+      "docs/agent-log/handoffs/CLAUDE-2026-10-28-agent-loop-f3-ranking-handoff.json"
+    ],
+    "tests_run": [
+      "pytest (full suite): 526 passed, 2 skipped.",
+      "pytest tests/test_fusion: 149 passed, 2 skipped (23 new in test_agent_loop_ranking.py; the #126 prompt test now checks that no verb is named, plus one grammar test).",
+      "flake8 CI gate (E9,F63,F7,F82) on src/: 0. flake8 max-line-length 100 on changed files: clean.",
+      "Headless Godot 4.7.2 with Qwen3-0.6B Q8_0 (CPU), 240 s per run: see work_completed."
+    ],
+    "tests_passing": true
+  }
+}

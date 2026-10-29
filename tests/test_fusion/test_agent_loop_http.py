@@ -5,7 +5,7 @@ from __future__ import annotations
 from fastapi.testclient import TestClient
 
 from src.fusion.agent_loop import AgentLoopProtocolError
-from src.fusion.agent_loop_http import _fallback_decide, create_app
+from src.fusion.agent_loop_http import build_decision_source, create_app
 from src.fusion.agent_loop_registry import AgentRegistry
 
 
@@ -122,15 +122,15 @@ def test_protocol_error_type_used_by_seam():
     assert issubclass(AgentLoopProtocolError, ValueError)
 
 
-def test_fallback_only_approaches_an_available_target_with_affordance():
-    observation = _perception()
-    intent = _fallback_decide(observation)
-    assert intent["verb"] == "approach"
-    assert intent["targetId"] == "desk_1"
+def test_without_a_model_the_goal_baseline_decides(monkeypatch):
+    monkeypatch.delenv("FUSION_GGUF_MODEL", raising=False)
+    decide = build_decision_source()
 
-    observation["visibleEntities"][0]["affordances"] = ["use", "sit"]
-    intent = _fallback_decide(observation)
-    assert intent["verb"] == "wait"
+    intent = decide(_perception())
+
+    # desk_1 serves StayAlert's focus need and affords sit, the first acting verb.
+    assert intent["verb"] == "sit" and intent["targetId"] == "desk_1"
+    assert intent["observedTick"] == 42
 
 
 def test_unregistered_agent_fails_closed_before_any_decision():

@@ -172,7 +172,8 @@ def test_goal_follows_the_avatars_state_between_decisions():
 
     decide(perception(tick=1))
     registry.get("stay_alert_001").avatar.stress_level = 0.9
-    decide(perception(tick=2))
+    # The agent moved, so F3 still allows the fake model's repeated approach.
+    decide(perception(tick=2, x=3.0))
 
     assert fake.user_message(1)["context"]["needs"] == ["rest", "quiet"]
 

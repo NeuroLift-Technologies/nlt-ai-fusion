@@ -1,0 +1,58 @@
+{
+  "handoff_record": {
+    "session_id": "claude-code-session_01UNjnjnVoMiD4yeZEmiqfMa",
+    "agent_name": "Claude (Anthropic) via Claude Code session",
+    "date": "2026-10-29T01:30:00+00:00",
+    "otoi_version": "ORG-DEV-OTOI-1.0.3",
+    "repo": "NeuroLift-Technologies/nlt-ai-fusion",
+    "branch": "ccr-100a7dbc-intpwq",
+    "work_completed": [
+      "A: guide() returns ranked options (goal-relevant pairs; approach to unvisited targets; everything else; wait last). The model input lists the best 16 (MAX_LISTED_OPTIONS) and the GGUF grammar offers all allowed pairs in that order (option_schemas).",
+      "Rule-1 fix: an unchanged sit/rest/use on a goal-relevant, non-portal target within the 1 m arrival radius is no longer excluded (it caused the baseline to alternate between two desk chairs).",
+      "C: src/fusion/agent_loop_baseline.py goal_baseline takes the first-ranked option; it replaces the old approach-first-entity fallback when no GGUF model is configured.",
+      "Review by a separate NLT Code Reviewer agent: no blockers; door exemption, approach-only ping-pong, required options, wording, prompt cap and 8 tests addressed.",
+      "B (verified, final code): offline, 12 perceptions per stratum. Spawn: picked option 1 8/12. Goal not in view: 12/12, approach unvisited doors. Goal in view: use door_6_office 11/12.",
+      "C (verified, final code, headless 300 s): acceptance 4a passed. Baseline went from the spawn through door_1_office into workplace_2, sat at desk_chair_2 and stayed seated (134 intents accepted).",
+      "D (verified, final code, headless 240 s): Qwen looped at the spawn. use well 45, use plaza 5; p50 2.37 s, p95 3.88 s. Option 1 was tier 3 (all visible targets visited) in 40/61 decisions; Qwen picked option 1 in 34/61."
+    ],
+    "work_in_progress": [
+      "Stop point per Josh: the avatar loops at the spawn after A. This is the case for an explore intent (v1.1), awaiting Josh.",
+      "F5 (dev PC rerun of 4a/4b) not run.",
+      "P0 timeout/slot hardening (starting point 15 s, below Godot's 30 s) still open, not part of this work order.",
+      "nlt-world-engine docs fix (SIGINT note, AgentHarness 151 -> 155) still to bundle into a later PR."
+    ],
+    "blockers": [
+      "explore intent / way out of the spawn needs Josh's decision (brief §11.4)."
+    ],
+    "decisions_made": [
+      "Josh 2026-10-29: keep the #135 prompt; exploration lives in Fusion; no engine spawn/range change; no contract change; Fusion's ranking decides what comes first.",
+      "Visited = an approach, use, sit or rest on the target in the per-agent history since entering the scene.",
+      "Repeating sit/use/rest on the held goal target is allowed: the engine treats it as a no-op, while wait would release the anchor."
+    ],
+    "decisions_pending": [
+      "explore intent (v1.1)",
+      "Rule 3 and wait (now measurable after A)"
+    ],
+    "escalations": [],
+    "next_agent_notes": "The F4 baseline escapes the spawn only because door_7_shop and door_1_office reach the 25 m perception edge from the plaza's west side; Qwen does not reliably take option 1 once history is involved. Benchmarks used a logging proxy between Godot and Fusion (port 8002 -> 8001) to record target ids; nlt-world-engine tools/headless-loop.sh runs the same loop without it.",
+    "files_modified": [
+      "src/fusion/agent_loop_ranking.py",
+      "src/fusion/agent_loop_choices.py",
+      "src/fusion/agent_loop_baseline.py",
+      "src/fusion/agent_loop_http.py",
+      "src/fusion/gguf_agent_decision.py",
+      "tests/test_fusion/test_agent_loop_ranking.py",
+      "tests/test_fusion/test_agent_loop_baseline.py",
+      "tests/test_fusion/test_agent_loop_http.py",
+      "docs/specs/AGENT-LOOP-003-fusion-state-and-goals-brief.md",
+      "docs/agent-loop-model-adapter.md",
+      "docs/active-threads.md",
+      "docs/agent-log/handoffs/CLAUDE-2026-10-29-agent-loop-f3-options-f4-baseline-handoff.json"
+    ],
+    "tests_run": [
+      "pytest (full suite): 553 passed, 2 skipped.",
+      "flake8 on changed files and the CI gate: clean. Governance validator: 33/33."
+    ],
+    "tests_passing": true
+  }
+}

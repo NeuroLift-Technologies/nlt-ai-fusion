@@ -1,7 +1,7 @@
 """Async loopback HTTP transport for the nlt.agent-loop.v1 contract.
 
 Godot POSTs one perception per decision opportunity to this server; a Fusion
-decision source (local GGUF model or deterministic fallback) returns a correlated
+decision source (local GGUF model or the deterministic goal baseline) returns a correlated
 intent. Transport-neutral contract unchanged — this module only adds the
 listener the contract deliberately left undecided.
 
@@ -19,7 +19,7 @@ Boundaries (docs/contracts/agent-loop-v1.md):
     Godot's job; this server never claims execution.
 
 Run:
-    python -m src.fusion.agent_loop_http      # deterministic fallback decision
+    python -m src.fusion.agent_loop_http      # deterministic goal baseline (F4)
     FUSION_GGUF_MODEL=/path/model.gguf python -m src.fusion.agent_loop_http
 """
 
@@ -27,7 +27,6 @@ from __future__ import annotations
 
 import asyncio
 import os
-import uuid
 from typing import Any, Callable, Mapping
 
 from fastapi import FastAPI, Request, Response
@@ -38,65 +37,30 @@ from .agent_loop import (
     PROTOCOL_VERSION,
     validate_perception,
 )
+from .agent_loop_baseline import goal_baseline
 from .agent_loop_goals import with_goal
 from .agent_loop_registry import AgentRegistry, build_default_registry
-from .agent_loop_memory import (
-    DEFAULT_HISTORY_SIZE,
-    StatefulAgentLoopDecision,
-    ignore_history,
-)
-
-
-def _fallback_decide(observation: Mapping[str, Any]) -> dict[str, Any]:
-    """Model-free decision source so the loop runs without a GGUF file.
-
-    Chooses the first visible entity that is not occupied; otherwise waits.
-    Deterministic on purpose: it is the control condition, not a wander loop.
-    """
-    for entity in observation.get("visibleEntities", []):
-        if (
-            entity.get("occupied") is False
-            and entity.get("kind") != "agent"
-            and "approach" in entity.get("affordances", [])
-        ):
-            return {
-                "protocolVersion": PROTOCOL_VERSION,
-                "messageType": "intent",
-                "messageId": f"intent-{uuid.uuid4().hex[:12]}",
-                "agentId": observation["agentId"],
-                "observedTick": observation["tick"],
-                "verb": "approach",
-                "targetId": entity["id"],
-            }
-    return {
-        "protocolVersion": PROTOCOL_VERSION,
-        "messageType": "intent",
-        "messageId": f"intent-{uuid.uuid4().hex[:12]}",
-        "agentId": observation["agentId"],
-        "observedTick": observation["tick"],
-        "verb": "wait",
-    }
+from .agent_loop_memory import DEFAULT_HISTORY_SIZE, StatefulAgentLoopDecision
 
 
 def build_decision_source(
     registry: AgentRegistry | None = None,
 ) -> Callable[[Mapping[str, Any]], Mapping[str, Any]]:
-    """GGUF model when FUSION_GGUF_MODEL is set, else the fallback, with per-agent memory.
+    """GGUF model when FUSION_GGUF_MODEL is set, else the goal baseline, with per-agent memory.
 
-    The model is given the goal of the Avatar registered under each perception's agentId and its
-    recent decisions (AGENT-LOOP-003 F2). The fallback ignores both.
+    The model is given the goal of the Avatar registered under each perception's agentId, its
+    recent decisions (AGENT-LOOP-003 F2) and the ranked options (F3). Without a model, the goal
+    baseline (F4) takes the first-ranked option for the same goal.
     FUSION_AGENT_LOOP_HISTORY sets how many past decisions each agent remembers.
     """
     raw_size = os.environ.get("FUSION_AGENT_LOOP_HISTORY", "").strip()
     history_size = int(raw_size) if raw_size else DEFAULT_HISTORY_SIZE
     model_path = os.environ.get("FUSION_GGUF_MODEL", "").strip()
+    agents = registry if registry is not None else build_default_registry()
     if not model_path:
-        return StatefulAgentLoopDecision(
-            ignore_history(_fallback_decide), history_size=history_size
-        )
+        return StatefulAgentLoopDecision(goal_baseline(agents), history_size=history_size)
     from .gguf_agent_decision import LlamaCppAgentLoopDecision
 
-    agents = registry if registry is not None else build_default_registry()
     return StatefulAgentLoopDecision(
         with_goal(LlamaCppAgentLoopDecision(model_path), agents),
         history_size=history_size,
