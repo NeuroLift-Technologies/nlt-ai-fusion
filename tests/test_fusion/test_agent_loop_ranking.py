@@ -457,3 +457,27 @@ def test_a_new_unvisited_target_still_comes_before_the_walk_under_way():
     )
     history = (record("approach", "plaza", changed=True),)
     assert guide(observation, FOCUS, history).options[0] == ("approach", "door_7_shop")
+
+
+def test_a_target_that_moved_while_the_agent_stood_still_is_not_a_walk_under_way():
+    # The outcome "changed" only because the target moved; the agent did not move.
+    moved_target = DecisionRecord(
+        tick=1,
+        scene_id="open_world",
+        verb="approach",
+        target_id="plaza",
+        outcome=DecisionOutcome(
+            ticks_elapsed=1,
+            moved_distance=0.0,
+            scene_changed=False,
+            target_visible=True,
+            target_distance_before=2.0,
+            target_distance_after=4.0,
+            target_taken=False,
+        ),
+    )
+    assert moved_target.outcome.changed
+    observation = perception([entity("plaza", 4.0), entity("well", 9.0)])
+    history = (record("approach", "well", changed=True), moved_target)
+    # Without a walk under way, the farther visited target comes first.
+    assert guide(observation, FOCUS, history).options[0] == ("approach", "well")

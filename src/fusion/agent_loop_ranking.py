@@ -52,7 +52,7 @@ from math import hypot
 from typing import Any, Mapping, Sequence
 
 from .agent_loop_choices import grounded_choices
-from .agent_loop_memory import DecisionRecord
+from .agent_loop_memory import MOVE_EPSILON, DecisionRecord
 
 # The engine's arrival radius for a targeted move, in metres (AvatarCharacter.ApplyIntent).
 ARRIVAL_RADIUS = 1.0
@@ -196,12 +196,16 @@ def rank_options(
 def walk_under_way(
     observation: Mapping[str, Any], history: Sequence[DecisionRecord]
 ) -> str | None:
-    """The last decision's target, when it was an approach in this scene that moved the agent."""
+    """The last decision's target, when it was an approach in this scene that moved the agent.
+
+    The agent itself must have moved: `outcome.changed` alone also counts a target that moved while
+    the agent stood still, which would keep the agent on a failed approach instead of exploring.
+    """
     since_entry = _since_entry(observation, history)
     if not since_entry:
         return None
     last = since_entry[-1]
-    if last.verb == "approach" and last.outcome.changed:
+    if last.verb == "approach" and last.outcome.moved_distance >= MOVE_EPSILON:
         return last.target_id
     return None
 
