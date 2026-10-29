@@ -26,8 +26,9 @@ that is selected but cannot be loaded, stops the endpoint at startup.
 Each decision may take at most `FUSION_AGENT_LOOP_TIMEOUT` seconds (default 15; it must be above
 0 and below Godot's own 30 s wait). A decision that takes longer gets 503, and the model is
 quarantined: every new request, for any agent, gets 503 at once, without starting a new inference,
-until the stuck call returns or the process restarts. Requests already waiting for the model when it
-was quarantined get 503 when their own time runs out and never start inference. The timed-out
+until the stuck call returns or the process restarts. A request already waiting for the model when it
+was quarantined gets 503 if its own time runs out first, and then never starts inference; one still
+within its time when the stuck call returns goes ahead, since the model is free again. The timed-out
 decision is abandoned: its result is discarded and it is not remembered, since Godot never received
 an intent for it. Decisions
 on one model instance run one at a time. Perceptions and returned intents are validated, each avatar is limited to one

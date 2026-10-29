@@ -56,12 +56,13 @@ MODEL_KINDS = ("baseline", "gguf", "transformers")
 def selected_model() -> str:
     """FUSION_AGENT_LOOP_MODEL: baseline, gguf or transformers. Unset, it is gguf when
     FUSION_GGUF_MODEL is set (as before it existed), else baseline. Anything else fails."""
-    kind = os.environ.get("FUSION_AGENT_LOOP_MODEL", "").strip().lower()
-    if not kind:
+    raw = os.environ.get("FUSION_AGENT_LOOP_MODEL", "").strip()
+    if not raw:
         return "gguf" if os.environ.get("FUSION_GGUF_MODEL", "").strip() else "baseline"
+    kind = raw.lower()
     if kind not in MODEL_KINDS:
         raise ValueError(
-            f"FUSION_AGENT_LOOP_MODEL must be one of {', '.join(MODEL_KINDS)}: {kind!r}"
+            f"FUSION_AGENT_LOOP_MODEL must be one of {', '.join(MODEL_KINDS)}: {raw!r}"
         )
     return kind
 
@@ -87,18 +88,19 @@ def build_decision_source(
     if kind == "gguf":
         from .gguf_agent_decision import LlamaCppAgentLoopDecision
 
-        model: Any = LlamaCppAgentLoopDecision(_model_path("FUSION_GGUF_MODEL"))
+        model: Any = LlamaCppAgentLoopDecision(_model_path("FUSION_GGUF_MODEL", kind))
     else:
         from .transformers_agent_decision import TransformersAgentLoopDecision
 
-        model = TransformersAgentLoopDecision(_model_path("FUSION_TRANSFORMERS_MODEL"))
+        model = TransformersAgentLoopDecision(_model_path("FUSION_TRANSFORMERS_MODEL", kind))
     return StatefulAgentLoopDecision(with_goal(model, agents), history_size=history_size)
 
 
-def _model_path(variable: str) -> str:
+def _model_path(variable: str, kind: str) -> str:
+    """The model location `variable` holds; fails at startup when it is unset."""
     path = os.environ.get(variable, "").strip()
     if not path:
-        raise ValueError(f"{variable} must be set for FUSION_AGENT_LOOP_MODEL={selected_model()}")
+        raise ValueError(f"{variable} must be set for FUSION_AGENT_LOOP_MODEL={kind}")
     return path
 
 
@@ -121,6 +123,7 @@ def create_app(
 
     @app.post("/agent-loop/perception")
     async def perception(request: Request) -> Response:
+        """Answer one perception with an intent, or a fail-closed error with none."""
         body = await _read_perception(request, agents)
         if isinstance(body, Response):
             return body
