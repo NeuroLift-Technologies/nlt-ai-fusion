@@ -63,9 +63,8 @@ def entity(entity_id, x, z=0.0, affordances=("approach", "use", "look_at"), occu
     }
 
 
-# A goal-relevant target kept in view by the rule-1 and rule-3 tests. With nothing goal-relevant
-# in view, explore mode (#136) offers only `approach`, which would hide the `use` / `look_at`
-# pairs those tests are about.
+# A goal-relevant target kept in view by the rule-1 and rule-3 tests, so they test the
+# anti-repeat rules with a goal in view rather than explore ranking.
 OFFICE_DOOR = entity("door_6_office", 20.0)
 
 
@@ -174,7 +173,7 @@ def test_last_unchanged_pair_is_excluded_on_the_next_decision():
     so `("use","well")` is excluded from the grammar on the following decision and
     the intent falls back to `wait`. This test passes because the fake cooperatively
     answers `wait`; once the pair is no longer the last decision it is re-offered
-    (rule 1 only drops the last pair) — see the xfail test below for that gap.
+    (rule 1 only drops the last pair), demoted — see the alternation test below.
 
     Layer: F1 memory (outcome from next perception) + F3 anti-repeat rule 1.
     """
@@ -204,18 +203,13 @@ def test_last_unchanged_pair_is_excluded_on_the_next_decision():
     assert ("use", "well") not in fake.offered
 
 
-@pytest.mark.xfail(
-    reason="Known gap: rule 1 drops only the last unchanged pair, so alternating "
-    "use well / use plaza with no movement is not suppressed. Tracked separately."
-)
-def test_an_unchanged_pair_is_not_reoffered_until_state_changes():
-    """Once a (verb, target) produces no change, it should not be re-offered until
-    the world state changes. Rule 1 currently only excludes the last pair, so an
-    alternating sequence keeps flip-flopping between two unchanged pairs. Known gap;
-    tracked separately. Marked xfail until fixed; a later fix that suppresses all
-    unchanged pairs would make this pass (xpass) and the marker should be removed.
+def test_an_unchanged_pair_is_demoted_not_excluded():
+    """Alternating use well / use plaza with no movement (the #135 engine loop) is broken up by
+    ranking, not by exclusion: once chosen in this scene, `use well` ranks below every pair in
+    its group not yet chosen and below every approach, but stays allowed (Josh, 2026-10-28:
+    "demote them; never forbid them").
 
-    Layer: F3 anti-repeat rule 1.
+    Layer: F3 ranking (tier 3 novelty demotion).
     """
     registry = build_default_registry()
     decide, fake = model_with(
@@ -224,23 +218,26 @@ def test_an_unchanged_pair_is_not_reoffered_until_state_changes():
             '{"verb":"use","targetId":"well"}',
             '{"verb":"use","targetId":"plaza"}',
             '{"verb":"use","targetId":"well"}',
-            '{"verb":"use","targetId":"plaza"}',
         ],
     )
+    # All three within the hold radius, so standing still is not a blocked target either.
     base = perception(
-        [entity("well", 6.0), entity("plaza", 8.0), OFFICE_DOOR],
+        [entity("well", 1.2), entity("plaza", -1.2), entity("bench", 0.0, z=1.4), OFFICE_DOOR],
         tick=1,
         x=0.0,
     )
-    intents = []
-    for tick in range(1, 5):
-        obs = {**base, "tick": tick}
-        intents.append(decide(obs))
+    intents = [decide({**base, "tick": tick}) for tick in range(1, 4)]
 
     verbs = [(i["verb"], i.get("targetId")) for i in intents]
-    assert verbs[0] == ("use", "well")
-    # Desired: well is not re-offered after its unchanged first use.
-    assert all(v != ("use", "well") for v in verbs[1:])
+    assert verbs == [("use", "well"), ("use", "plaza"), ("use", "well")]
+    offered = fake.offered
+    assert ("use", "plaza") not in offered  # rule 1: the last pair, unchanged
+    assert offered.index(("use", "bench")) < offered.index(("use", "well"))
+    assert all(
+        offered.index(pair) < offered.index(("use", "well"))
+        for pair in offered
+        if pair[0] == "approach"
+    )
 
 
 # ---------------------------------------------------------------------------
