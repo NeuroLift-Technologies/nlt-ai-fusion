@@ -94,3 +94,9 @@ def test_waits_when_every_pair_is_excluded_or_occupied():
     taken["occupied"] = True
     intent = baseline()(perception([taken]))
     assert intent["verb"] == "wait"
+
+
+def test_with_no_goal_in_view_the_baseline_explores_instead_of_using_what_is_near():
+    decide = baseline()
+    intent = decide(perception([entity("plaza", 6.0), entity("well", 0.5)], tick=1))
+    assert (intent["verb"], intent["targetId"]) == ("approach", "plaza")

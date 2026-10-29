@@ -336,14 +336,16 @@ def test_only_holding_verbs_are_exempt(verb):
 
 
 def test_third_tier_puts_acting_verbs_before_visited_approaches_and_look_at_last():
-    observation = perception([entity("well", 6.0), entity("plaza", 3.0)], x=0.0)
+    view = [entity("well", 6.0), entity("plaza", 3.0), entity("door_1_office", 20.0)]
     history = (record("approach", "well", changed=True), record("approach", "plaza", changed=True))
-    options = guide(observation, FOCUS, history).options
-    assert options == (
+    options = guide(perception(view, x=0.0), FOCUS, history).options
+    assert options[:2] == (("use", "door_1_office"), ("approach", "door_1_office"))
+    assert options[2:] == (
         ("use", "plaza"),
         ("use", "well"),
         ("approach", "plaza"),
         ("approach", "well"),
+        ("look_at", "door_1_office"),
         ("look_at", "plaza"),
         ("look_at", "well"),
     )
@@ -389,10 +391,10 @@ def test_input_lists_at_most_the_best_options_while_the_grammar_offers_all():
     from src.fusion.agent_loop_choices import MAX_LISTED_OPTIONS
 
     seats = [
-        entity(f"chair_{i}", 2.0 + i, affordances=("sit", "approach", "look_at"))
+        entity(f"desk_chair_{i}", 2.0 + i, affordances=("sit", "approach", "look_at"))
         for i in range(10)
     ]
-    fake = FakeLlama(content='{"verb":"sit","targetId":"chair_0"}')
+    fake = FakeLlama(content='{"verb":"sit","targetId":"desk_chair_0"}')
     decide = StatefulAgentLoopDecision(
         with_goal(LlamaCppAgentLoopDecision("unused.gguf", model=fake), build_default_registry())
     )
@@ -402,3 +404,56 @@ def test_input_lists_at_most_the_best_options_while_the_grammar_offers_all():
     assert len(message["options"]) == MAX_LISTED_OPTIONS + 1
     assert message["options"][-1] == {"verb": "wait"}
     assert len(fake.options(0)) == 30 + 1
+
+
+def test_with_no_goal_in_view_only_approaches_are_offered_farthest_unvisited_first():
+    observation = perception(
+        [entity("plaza", 3.0), entity("well", 8.0), entity("door_2_shop", 20.0)]
+    )
+    guidance = guide(observation, FOCUS, (record("approach", "door_2_shop", changed=True),))
+    assert guidance.options == (
+        ("approach", "well"),
+        ("approach", "plaza"),
+        ("approach", "door_2_shop"),
+    )
+    assert ("use", "well") in guidance.excluded and ("look_at", "plaza") in guidance.excluded
+
+
+def test_at_the_spawn_exploring_walks_to_the_other_landmark_instead_of_using_one():
+    # Standing at the well with the plaza visited: the only move is back across to the plaza,
+    # which is what brings the shop and office doors into view in the engine.
+    observation = perception([entity("plaza", 6.0), entity("well", 0.5)])
+    history = (record("approach", "plaza", changed=True), record("approach", "well", changed=True))
+    assert guide(observation, FOCUS, history).options == (("approach", "plaza"),)
+
+
+def test_exploring_ends_as_soon_as_something_goal_relevant_is_in_view():
+    observation = perception(
+        [entity("plaza", 3.0), entity("well", 8.0), entity("door_1_office", 22.0)]
+    )
+    guidance = guide(observation, FOCUS, ())
+    assert guidance.options[0] == ("use", "door_1_office")
+    assert ("use", "well") in guidance.options
+
+
+def test_with_no_approach_left_the_other_choices_are_kept():
+    # Nothing to walk to: exploring cannot leave the agent with only wait if it can still act.
+    observation = perception([entity("well", 0.5)])
+    options = guide(observation, FOCUS, ()).options
+    assert ("use", "well") in options and ("approach", "well") not in options
+
+
+def test_exploring_finishes_the_walk_under_way_before_turning_back():
+    # Halfway from the well to the plaza: both visited, the well is now farther, but the agent
+    # keeps walking to the plaza instead of turning back.
+    observation = perception([entity("plaza", 2.8), entity("well", 5.7)])
+    history = (record("approach", "well", changed=True), record("approach", "plaza", changed=True))
+    assert guide(observation, FOCUS, history).options[0] == ("approach", "plaza")
+
+
+def test_a_new_unvisited_target_still_comes_before_the_walk_under_way():
+    observation = perception(
+        [entity("plaza", 2.8), entity("well", 5.7), entity("door_7_shop", 24.0)]
+    )
+    history = (record("approach", "plaza", changed=True),)
+    assert guide(observation, FOCUS, history).options[0] == ("approach", "door_7_shop")

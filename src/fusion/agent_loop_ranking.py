@@ -27,6 +27,15 @@ change that (F2 measured it), so the bias is removed structurally:
   3. everything else, `look_at` included.
   `wait` comes last. The model input lists the options in this order and the output grammar offers
   them in this order. The F4 baseline takes the first one.
+- **Explore when the goal is not in view** (Josh, 2026-10-29: "if it has no goal then it should
+  explore"). When no visible entity is goal-relevant and some `approach` is allowed, only
+  `approach` is offered: unvisited targets first, farthest first, so each move carries the agent
+  toward the edge of what it can perceive and new places come into view. Next, the walk already
+  under way (the last approach, still moving the agent), so a walk is finished before another
+  visited target is picked; without this the agent turned back halfway between two landmarks.
+  `use`, `sit`, `rest` and `look_at` on targets that do not serve the goal are left out, so the
+  agent cannot park beside one. No new verb and no reliance on the engine's wander: every move
+  is a targeted `approach`.
 
 `wait` is never dropped, so a model always has something to choose. Exclusions are computed from
 the current perception and the F1 history only; history is cleared when the engine restarts, and
@@ -134,10 +143,14 @@ def rank_options(
     goal_relevant: frozenset[str],
     visited: frozenset[str],
     needs: Sequence[str],
+    distances: Mapping[str, float] | None = None,
+    walking_to: str | None = None,
 ) -> tuple[tuple[str, str], ...]:
     """Put the allowed pairs in one list, best first (module docstring, "Ranked options").
 
-    `choices` maps each verb to its allowed targets; `order` is the entity ranking.
+    `choices` maps each verb to its allowed targets; `order` is the entity ranking. With nothing
+    goal-relevant in view, only approaches remain allowed (see `exploring_exclusions`) and they
+    are ranked unvisited first, then `walking_to` (the walk under way), then farthest first.
     """
     position = {entity_id: index for index, entity_id in enumerate(order)}
     allowed = [
@@ -145,6 +158,18 @@ def rank_options(
         for verb, targets in choices.items()
         for target in targets
     ]
+    if not goal_relevant and allowed and all(verb == "approach" for verb, _ in allowed):
+        far = distances or {}
+        return tuple(
+            sorted(
+                allowed,
+                key=lambda pair: (
+                    0 if pair[1] not in visited else 1 if pair[1] == walking_to else 2,
+                    -far.get(pair[1], 0.0),
+                    position.get(pair[1], len(position)),
+                ),
+            )
+        )
     acting = _RESTING_ACTING_VERBS if _RESTING_NEEDS & set(needs) else _ACTING_VERBS
     verb_rank = {verb: index for index, verb in enumerate(acting)}
 
@@ -165,6 +190,37 @@ def rank_options(
                 position.get(pair[1], len(position)),
             ),
         )
+    )
+
+
+def walk_under_way(
+    observation: Mapping[str, Any], history: Sequence[DecisionRecord]
+) -> str | None:
+    """The last decision's target, when it was an approach in this scene that moved the agent."""
+    since_entry = _since_entry(observation, history)
+    if not since_entry:
+        return None
+    last = since_entry[-1]
+    if last.verb == "approach" and last.outcome.changed:
+        return last.target_id
+    return None
+
+
+def exploring_exclusions(
+    observation: Mapping[str, Any], guidance: ChoiceGuidance
+) -> frozenset[tuple[str, str]]:
+    """With nothing goal-relevant in view, every allowed pair except `approach`, if some approach
+    is allowed; else nothing. Leaving these out is what makes the agent explore."""
+    if guidance.goal_relevant:
+        return frozenset()
+    choices = grounded_choices(observation, guidance)
+    if not choices.get("approach"):
+        return frozenset()
+    return frozenset(
+        (verb, target)
+        for verb, targets in choices.items()
+        if verb != "approach"
+        for target in targets
     )
 
 
@@ -224,11 +280,16 @@ def guide(
         excluded=excluded_pairs(observation, history, distances, relevant),
         options=(),
     )
+    guidance = replace(
+        guidance, excluded=guidance.excluded | exploring_exclusions(observation, guidance)
+    )
     options = rank_options(
         grounded_choices(observation, guidance),
         guidance.order,
         relevant,
         visited_targets(observation, history),
         needs,
+        distances,
+        walk_under_way(observation, history),
     )
     return replace(guidance, options=options)
