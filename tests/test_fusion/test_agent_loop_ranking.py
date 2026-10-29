@@ -586,7 +586,7 @@ def test_a_goal_out_of_reach_does_not_stop_the_agent_exploring():
 
 def test_an_approach_that_made_no_progress_blocks_the_target():
     observation = perception([entity("door_4_home", 7.6), entity("well", 12.0)])
-    history = (approach_record("door_4_home", before=7.6, after=7.6),)
+    history = (approach_record("door_4_home", before=7.6, after=7.6),) * 2
     guidance = guide(observation, FOCUS, history)
     assert ("approach", "door_4_home") in guidance.excluded
     assert ("use", "door_4_home") in guidance.excluded
@@ -607,7 +607,9 @@ def use_record(target, before, after):
 def test_a_use_that_left_the_agent_short_of_the_target_blocks_it():
     # Measured with Qwen: `use door_4_home` chosen 9 times while the agent stood 7.61 m away.
     observation = perception([entity("door_4_home", 7.6), entity("well", 12.0)])
-    guidance = guide(observation, FOCUS, (use_record("door_4_home", before=7.61, after=7.61),))
+    stall = use_record("door_4_home", before=7.61, after=7.61)
+    assert ("use", "door_4_home") not in guide(observation, FOCUS, (stall,)).excluded
+    guidance = guide(observation, FOCUS, (stall, stall))
     assert ("use", "door_4_home") in guidance.excluded
     assert ("approach", "door_4_home") in guidance.excluded
 
@@ -621,14 +623,22 @@ def test_a_seat_someone_else_took_meanwhile_is_not_blocked():
         approach_record("desk_chair_2", before=4.0, after=4.0, scene="office_1"), verb="sit"
     )
     taken = replace(taken, outcome=replace(taken.outcome, target_taken=True))
-    guidance = guide(observation, FOCUS, (taken,))
+    guidance = guide(observation, FOCUS, (taken, taken))
     assert ("approach", "desk_chair_2") not in guidance.excluded
 
 
-def test_using_a_target_from_within_the_hold_radius_does_not_block_it():
-    observation = perception([entity("well", 1.2)])
-    guidance = guide(observation, FOCUS, (use_record("well", before=1.2, after=1.2),))
-    assert ("use", "well") not in guidance.excluded
+def test_using_the_well_from_its_anchor_beside_it_does_not_block_it():
+    # Measured: an agent using the well stands 1.9-2.0 m from the well's position.
+    observation = perception([entity("well", 1.9)])
+    history = (use_record("well", before=1.9, after=1.9),) * 3
+    assert ("use", "well") not in guide(observation, FOCUS, history).excluded
+
+
+def test_one_stalled_decision_does_not_block_a_target():
+    # Measured: the next perception came 290 ticks after `use plaza`, before the walk started.
+    observation = perception([entity("plaza", 6.9), entity("well", 2.0)])
+    history = (use_record("plaza", before=7.05, after=6.87),)
+    assert ("use", "plaza") not in guide(observation, FOCUS, history).excluded
 
 
 def test_an_approach_after_which_the_agent_ended_up_farther_away_does_not_block():
@@ -644,6 +654,7 @@ def test_an_approach_after_which_the_agent_ended_up_farther_away_does_not_block(
 def test_a_blocked_target_is_retried_after_going_through_a_door():
     observation = perception([entity("door_4_home", 7.6)], scene="open_world")
     history = (
+        approach_record("door_4_home", before=7.6, after=7.6),
         approach_record("door_4_home", before=7.6, after=7.6),
         record("sit", "chair_1", changed=True, scene="home_4"),
     )

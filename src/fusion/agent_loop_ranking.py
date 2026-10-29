@@ -49,10 +49,11 @@ change that (F2 measured it), so the bias is removed structurally:
   would be out of reach at the position predicted from the avatar's velocity and the expected
   decision time are left out. A goal-relevant target that is out of reach does not stop the agent
   exploring.
-- **Blocked targets.** An approach, or a sit, use or rest, after which the agent is no closer
-  to and no farther from a target it is still short of, and that nobody else took, means the
-  target cannot be reached from here (measured: the agent stopped 7.6 m short of a raised
-  doorway, then chose `use` on it 9 times). Every pair on that target except `look_at` is left
+- **Blocked targets.** Two decisions on a target (approach, sit, use or rest) after each of
+  which the agent is no closer to and no farther from it, still short of it, with nobody else
+  holding it, mean the target cannot be reached from here (measured: the agent stopped 7.6 m
+  short of a raised doorway, then chose `use` on it 9 times). One such decision is not enough:
+  with a model deciding, the next perception can come before the walk has started. Every pair on that target except `look_at` is left
   out for the rest of the scene, within the remembered history. Ending up farther away is not
   counted: with a model taking seconds to decide, the wander after a `look_at` can carry the
   agent off before the approach executes, and counting that left only the well at the spawn.
@@ -81,6 +82,15 @@ ARRIVAL_RADIUS = 1.0
 # it. Wider than the arrival radius: a seated avatar drifts a little, and at 1.0 m exactly the
 # exemption from rule 1 lapsed after 70 decisions and the agent moved to the next chair.
 HOLD_RADIUS = 1.5
+
+# How far from an entity's position an agent can stand while it sits on, uses or rests on it: the
+# engine walks it to an anchor beside the entity (measured 1.9-2.0 m while using the well).
+HOLDING_REACH = 3.0
+
+# How many decisions on one target must leave the agent stuck short of it before it counts as
+# blocked. One can be timing: the next perception came 290 ticks after `use plaza`, before the
+# walk had started.
+BLOCKED_AFTER = 2
 
 # The engine's reach for any targeted intent, in metres, from the avatar's live position at
 # execution (IntentIngress.RecheckTarget).
@@ -263,7 +273,7 @@ def reachable_relevant(
 def _blocked(record: DecisionRecord) -> bool:
     """True when a decision that needed the agent to get to its target left the agent neither
     closer to nor farther from it, short of it: beyond the arrival radius for `approach`, beyond
-    the hold radius for `sit`, `use` and `rest`, which the agent may hold from a little farther.
+    `HOLDING_REACH` for `sit`, `use` and `rest`, which hold the agent at an anchor beside it.
     Farther means something else moved it, such as the wander after an earlier `look_at` while
     this decision was still being made; that says nothing about the target. Nor does a target
     someone else took meanwhile: the engine refuses to sit on, use or rest on it while it is
@@ -274,7 +284,7 @@ def _blocked(record: DecisionRecord) -> bool:
     before, after = outcome.target_distance_before, outcome.target_distance_after
     if before is None or after is None:
         return False
-    short_of = ARRIVAL_RADIUS if record.verb == "approach" else HOLD_RADIUS
+    short_of = ARRIVAL_RADIUS if record.verb == "approach" else HOLDING_REACH
     return after > short_of and abs(before - after) < MOVE_EPSILON
 
 
@@ -318,11 +328,14 @@ def excluded_pairs(
         )
         if last.target_id is not None and not last.outcome.changed and not holding_goal:
             excluded.add((last.verb, last.target_id))
+    stalls: dict[str, int] = {}
     for record in since_entry:
         if record.verb == "look_at" and record.target_id is not None:
             excluded.add(("look_at", record.target_id))
         if record.target_id is not None and _blocked(record):
-            excluded.update((verb, record.target_id) for verb in _REACHING_VERBS)
+            stalls[record.target_id] = stalls.get(record.target_id, 0) + 1
+            if stalls[record.target_id] >= BLOCKED_AFTER:
+                excluded.update((verb, record.target_id) for verb in _REACHING_VERBS)
 
     for entity_id, distance in distances.items():
         if distance <= ARRIVAL_RADIUS:
