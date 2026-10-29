@@ -1,0 +1,56 @@
+{
+  "handoff_record": {
+    "session_id": "claude-code-session_01UNjnjnVoMiD4yeZEmiqfMa",
+    "agent_name": "Claude (Anthropic) via Claude Code session",
+    "date": "2026-10-29T05:30:00+00:00",
+    "otoi_version": "ORG-DEV-OTOI-1.0.3",
+    "repo": "NeuroLift-Technologies/nlt-ai-fusion",
+    "branch": "ccr-100a7dbc-intpwq (+ ccr-100a7dbc-intpwq-timeout for #138)",
+    "work_completed": [
+      "#136 (merged): exploring when nothing goal-relevant is in view (unvisited targets farthest first; the walk under way finished first), predictive reach guard (engine rechecks 30 m at execution, perception reaches 25 m), blocked targets, 1.5 m hold radius. This PR had no handoff of its own; it is recorded here.",
+      "#137 (Kilo, merged): fixed the acceptance tests so they run (unclosed brace in FakeLlama, perception([]) call, office door kept in view for rule-1/rule-3 tests, trailing commas in the handoff JSON).",
+      "#139 (merged), Josh's handoff item A: tier 3 ranks approaches (least recently visited, then farthest), then sit/use/rest, then look_at, with novelty within each group. #136's exploring exclusion became a demotion (decision 2: demote, never forbid). Blocked targets: two stalls needed, holding verbs only beyond 3 m, moving farther away and targets someone else took do not count. Kilo's xfail alternation test is now a passing demotion test.",
+      "#138 (merged), item B: FUSION_AGENT_LOOP_TIMEOUT (default 15 s, must be > 0 and < Godot's 30 s), 503 + model quarantine, abandoned decisions write no memory (commit/abandon compare-and-set under one lock), cancelled requests quarantine too, Transformers adapter locked, FUSION_AGENT_LOOP_MODEL = baseline | gguf | transformers failing at startup otherwise.",
+      "Item C (measurement only, no production change): Qwen3-0.6B vs Qwen3-1.7B Q8 vs Qwen2.5-3B Q4, offline stratified set and 240 s engine runs; results in brief §12.3.",
+      "Docs: README agent-loop status, docs/agent-loop-model-adapter.md ranking section, brief §12, active-threads TH-028."
+    ],
+    "work_in_progress": [],
+    "blockers": [],
+    "decisions_made": [
+      "Exploring is a ranking, not a filter: #136's exclusion of non-goal holding actions conflicted with decision 2 and was turned into a demotion (#139).",
+      "Novelty demotion applies within each tier-3 group (approach / holding / look_at) rather than above the group order; novelty-first made the baseline use the spawn landmarks before walking. Josh's reviewer accepted the PR with this reading.",
+      "Blocked targets need two stalls and count holding verbs only beyond 3 m: one stall can be timing (a perception 290 ticks after the choice) and the well's use anchor is 1.9-2.0 m from its position.",
+      "The default model stays Qwen3-0.6B / baseline (handoff item C)."
+    ],
+    "decisions_pending": [
+      "Josh: what to do about the model limit. Qwen3-0.6B takes the first-ranked option 12-34% of the time; larger models are not reliably better and ~3x slower on this CPU (Qwen2.5-3B p95 up to 31 s, beyond the 15 s limit).",
+      "Josh: F5 (still open).",
+      "Josh: the door_4_home engine anchor on raised ground (engine-side; reported, not changed)."
+    ],
+    "escalations": [],
+    "next_agent_notes": "Read brief §12 first. Fusion side of AGENT-LOOP-003 F0-F4 plus the time limit is merged. The baseline passes 4a; no model passes 4b reliably (0.6B 2/5 runs, 1.7B 0/2, 3B 1/2). Unexplained: Qwen3-1.7B chose the reachable office door 0/7 in the engine but 12/12 offline. Inside the office, a ~15 s decision lands one perception late, so a model avatar hops between chairs (latency, not ranking). Engine benchmark tooling used: headless Godot 4.7.2 .NET with NLT_AGENT_LOOP_ENABLED=1, NLT_AGENT_LOOP_AGENT_ID=stay_alert_001, a logging proxy between Godot and Fusion; scripts lived in the session scratchpad and are not in the repo.",
+    "files_modified": [
+      "src/fusion/agent_loop_ranking.py",
+      "src/fusion/agent_loop_deadline.py",
+      "src/fusion/agent_loop_http.py",
+      "src/fusion/agent_loop_memory.py",
+      "src/fusion/gguf_agent_decision.py",
+      "src/fusion/transformers_agent_decision.py",
+      "tests/test_fusion/test_agent_loop_ranking.py",
+      "tests/test_fusion/test_agent_loop_acceptance.py",
+      "tests/test_fusion/test_agent_loop_deadline.py",
+      "README.md",
+      "docs/agent-loop-model-adapter.md",
+      "docs/specs/AGENT-LOOP-003-fusion-state-and-goals-brief.md",
+      "docs/active-threads.md"
+    ],
+    "tests_run": [
+      "tests/test_fusion on main after #138 + #139: 249 passed, 3 skipped.",
+      "Headless Godot 4.7.2 engine runs, 240 s each: baseline (office at decision 14, 0 rejections), Qwen3-0.6B x5, Qwen3-1.7B x2, Qwen2.5-3B x2.",
+      "Live check of #138 with real Qwen3-0.6B and FUSION_AGENT_LOOP_TIMEOUT=1: 503 at 1.003 s, immediate 503 while quarantined, new decision started after the stuck call returned; FUSION_AGENT_LOOP_MODEL=gpt fails at startup.",
+      "Separate NLT Code Reviewer agent on #138 and #139; Josh's review (Vibe) approved #138 and requested three doc changes on #139, all addressed."
+    ],
+    "tests_passing": true,
+    "pr_url": "https://github.com/NeuroLift-Technologies/nlt-ai-fusion/pull/138, https://github.com/NeuroLift-Technologies/nlt-ai-fusion/pull/139"
+  }
+}

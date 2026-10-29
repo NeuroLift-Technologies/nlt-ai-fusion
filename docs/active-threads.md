@@ -1,7 +1,7 @@
 # Active Threads — neurolift-ai-fusion
 
 **Governance:** ORG-DEV-OTOI-1.0.3
-**Last updated:** 2026-10-29T01:30:00+00:00
+**Last updated:** 2026-10-29T05:30:00+00:00
 **Maintained by:** All active agents (update at session start and end)
 
 ---
@@ -25,7 +25,7 @@
 | TH-025 | Let the local agent-loop models choose use / sit / rest / look_at, not only wait and approach (the world engine's AGENT-LOOP-002 doors and furniture) | Joshua W. Dorsey, Sr. | Claude Code | claude/pensive-shannon-x9on97 | ✅ Merged ([#126](https://github.com/NeuroLift-Technologies/neurolift-ai-fusion/pull/126)) | 2026-10-21T20:55:00+00:00 |
 | TH-026 | Fix the web build / Vercel preview deploy, red since #123 (workspace ERESOLVE from apps/mobile, Tailwind 4 major bump, postcss override conflict) | Joshua W. Dorsey, Sr. | Claude Code | claude/fix-web-build | 🟡 Fix on main via #126; this PR adds its records ([#127](https://github.com/NeuroLift-Technologies/neurolift-ai-fusion/pull/127)) | 2026-10-21T21:15:39+00:00 |
 | TH-027 | Make the README 20-pair roster canonical across neurolift-ai-fusion and nlt-fusion ([PR #130](https://github.com/NeuroLift-Technologies/neurolift-ai-fusion/pull/130), [nlt-world-engine#116](https://github.com/NeuroLift-Technologies/nlt-world-engine/pull/116)); pending Josh: review of the 18 proposed avatars/aides, Pages deploy on merge, DEPLOYMENT.md UE row, claude.ai Project text | Joshua W. Dorsey, Sr. | Claude Code | agent/claude-roster-canonicalization-20 | 🟡 In Review | 2026-10-22 |
-| TH-028 (proposed; Joshua assigns) | AGENT-LOOP-003: give the agent-loop decision source state, goals and memory (`docs/specs/AGENT-LOOP-003-fusion-state-and-goals-brief.md`). F0 + F1 merged (#132), F2 merged (#134). F3 (ranking, ranked options, no-verb prompt) and F4 (goal baseline; 4a passed headless) on this branch; Qwen loops at the spawn, which is the `explore` case awaiting Josh (brief §11.4); F5 open | Joshua W. Dorsey, Sr. | Claude Code | ccr-100a7dbc-intpwq | 🟡 F3 + F4 in review | 2026-10-29 |
+| TH-028 | AGENT-LOOP-003: give the agent-loop decision source state, goals and memory (`docs/specs/AGENT-LOOP-003-fusion-state-and-goals-brief.md`). F0-F4 merged (#132, #134, #135); exploring, reach guard, blocked targets (#136); acceptance tests (#137, Kilo); timeout + quarantine + model selection (#138); tier-3 ranking, demote-not-forbid (#139). Baseline passes 4a; no model passes 4b reliably (brief §12). Open: F5, model choice / decision time, the Qwen3-1.7B engine result | Joshua W. Dorsey, Sr. | Claude Code | ccr-100a7dbc-intpwq | 🟡 #132-#139 merged; F5 and model decision open | 2026-10-29 |
 
 
 ---

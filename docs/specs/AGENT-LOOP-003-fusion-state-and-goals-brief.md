@@ -277,3 +277,47 @@ Same setup for each run: Fusion `main` plus the change named, Qwen3-0.6B Q8_0, `
 - Known limits:
   - History carries no engine result, so a `sit` the engine rejected within 1 m of a goal target would be retried. Not reachable today for free targets that list the affordance.
   - "Visited" counts a choice even when the walk was interrupted.
+
+## 12. Explore, tier 3, time limit and larger models (#136-#139, 2026-10-29)
+
+### 12.1 Josh's decisions
+- 2026-10-29: "If it has no goal then it should explore", in Fusion, with no engine spawn,
+  perception-range or contract change (#136).
+- 2026-10-28 handoff: fix the spawn loop in Fusion ranking first; holding actions on non-goal
+  targets are demoted, never forbidden (decision 2); then a time limit with quarantine; then a
+  larger-model comparison with no change to the default model.
+
+### 12.2 What changed
+- #136: exploring (unvisited targets farthest first, the walk under way finished first), the reach
+  guard (the engine rechecks a 30 m reach at execution while perception reaches 25 m), blocked
+  targets, and a 1.5 m hold radius for staying seated.
+- #137 (Kilo): acceptance tests, with fixes so they run.
+- #139: tier 3 ranks approaches, then holding actions, then `look_at`, with novelty within each
+  group. #136's exploring exclusion became a demotion. Blocked targets need two stalls, count
+  holding verbs only beyond 3 m (the well holds the agent 1.9-2.0 m away), ignore moving farther
+  away and ignore targets someone else took.
+- #138: `FUSION_AGENT_LOOP_TIMEOUT` (15 s), 503 + quarantine, abandoned decisions write no memory,
+  the Transformers adapter is locked, `FUSION_AGENT_LOOP_MODEL` selects the source.
+
+### 12.3 Results (headless Godot 4.7.2 .NET, CPU, 240 s per run; verified)
+| | baseline | Qwen3-0.6B | Qwen3-1.7B | Qwen2.5-3B Q4 |
+|---|---|---|---|---|
+| runs | 1 | 5 | 2 | 2 |
+| office reached from the spawn | yes, decision 14 | 2/5 | 0/2 | 1/2 (decision 7) |
+| first-ranked option taken | 100% | 12-34% | 26-27% | 30-64% |
+| goal chosen when it could be acted on | 9/9 | 9/9 | 0/7 | 3/4 |
+| decision p50 / p95 | 0 / 0 s | 3-4 / 6-15 s | 10 / 13-21 s | 10-12 / 13-31 s |
+
+Offline, on 12 recorded perceptions per stratum with no history, all three models chose the goal
+door 12/12 when it was in view (p95 2.6, 6.0 and 7.1 s with 4 threads).
+
+### 12.4 Reading
+- The baseline passes 4a. No model passes 4b reliably; the samples are small.
+- Qwen3-0.6B no longer stays at the spawn, but can spend 10-15 decisions there on `use well`: it
+  rarely takes option 1, so a demoted pair is still chosen. Within decision 2 the ranking cannot
+  stop that; this is the model's limit, not the case for `explore`.
+- Larger models are about 3× slower on this CPU; Qwen2.5-3B's p95 went past Godot's 30 s and would
+  now meet the 15 s limit. Model size alone does not fix it here; decision time becomes the limit.
+- Inside the office, a 15 s decision lands one perception late, so the avatar hops between chairs.
+- Open: why Qwen3-1.7B passed the reachable office door 7 times in the engine but chose it 12/12
+  offline (not investigated).
