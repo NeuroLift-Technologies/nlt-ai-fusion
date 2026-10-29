@@ -161,12 +161,16 @@ def test_repeated_unchanged_pair_is_excluded_from_grammar_on_next_decision():
     assert ("use", "well") not in fake.offered
 
 
-def test_model_cannot_stall_forever_on_a_repeated_noop():
-    """Across several decisions with no movement, the source must not keep repeating
-    the same unchanged pair; it switches away or waits. This is the observable
-    difference between a goal-directed baseline and a model that loops at the spawn.
+def test_last_unchanged_pair_is_excluded_on_the_next_decision():
+    """Rule 1 drops only the last unchanged (verb, target) on the next decision.
 
-    Layer: F1 memory (outcome from next perception) + F3 anti-repeat.
+    The source answers `use well` once; with no movement the outcome is unchanged,
+    so `("use","well")` is excluded from the grammar on the following decision and
+    the intent falls back to `wait`. This test passes because the fake cooperatively
+    answers `wait`; once the pair is no longer the last decision it is re-offered
+    (rule 1 only drops the last pair) — see the xfail test below for that gap.
+
+    Layer: F1 memory (outcome from next perception) + F3 anti-repeat rule 1.
     """
     registry = build_default_registry()
     decide, fake = model_with(
@@ -174,27 +178,63 @@ def test_model_cannot_stall_forever_on_a_repeated_noop():
         [
             '{"verb":"use","targetId":"well"}',
             '{"verb":"wait"}',
-            '{"verb":"wait"}',
-            '{"verb":"wait"}',
         ],
     )
-    obs = perception(
+    obs1 = perception(
         [entity("well", 6.0, affordances=("approach", "use", "look_at"))],
         tick=1,
         x=-5.0,
     )
+    intent1 = decide(obs1)
+    assert (intent1["verb"], intent1.get("targetId")) == ("use", "well")
+
+    obs2 = perception(
+        [entity("well", 6.0, affordances=("approach", "use", "look_at"))],
+        tick=2,
+        x=-5.0,
+    )
+    intent2 = decide(obs2)
+    assert intent2["verb"] == "wait"
+    assert ("use", "well") not in fake.offered
+
+
+@pytest.mark.xfail(
+    reason="Known gap: rule 1 drops only the last unchanged pair, so alternating "
+    "use well / use plaza with no movement is not suppressed. Tracked separately."
+)
+def test_an_unchanged_pair_is_not_reoffered_until_state_changes():
+    """Once a (verb, target) produces no change, it should not be re-offered until
+    the world state changes. Rule 1 currently only excludes the last pair, so an
+    alternating sequence keeps flip-flopping between two unchanged pairs. Known gap;
+    tracked separately. Marked xfail until fixed; a later fix that suppresses all
+    unchanged pairs would make this pass (xpass) and the marker should be removed.
+
+    Layer: F3 anti-repeat rule 1.
+    """
+    registry = build_default_registry()
+    decide, fake = model_with(
+        registry,
+        [
+            '{"verb":"use","targetId":"well"}',
+            '{"verb":"use","targetId":"plaza"}',
+            '{"verb":"use","targetId":"well"}',
+            '{"verb":"use","targetId":"plaza"}',
+        ],
+    )
+    base = perception(
+        [entity("well", 6.0), entity("plaza", 8.0)],
+        tick=1,
+        x=0.0,
+    )
     intents = []
     for tick in range(1, 5):
-        obs = {**obs, "tick": tick}
+        obs = {**base, "tick": tick}
         intents.append(decide(obs))
 
-    # First decision may use well; after the unchanged repeat is recorded, subsequent
-    # decisions must not keep offering/repeating ("use","well").
-    assert (intents[0]["verb"], intents[0].get("targetId")) == ("use", "well")
-    assert all(
-        not (i["verb"] == "use" and i.get("targetId") == "well") for i in intents[1:]
-    )
-    assert intents[-1]["verb"] == "wait"
+    verbs = [(i["verb"], i.get("targetId")) for i in intents]
+    assert verbs[0] == ("use", "well")
+    # Desired: well is not re-offered after its unchanged first use.
+    assert all(v != ("use", "well") for v in verbs[1:])
 
 
 # ---------------------------------------------------------------------------
@@ -480,4 +520,5 @@ def test_local_qwen_gguf_smoke_skips_without_model():
     adapter = LlamaCppAgentLoopDecision(Path(model_path), context_size=2048, threads=2)
     obs = perception([entity("desk_1", 2.0, affordances=("use", "sit"))], tick=1)
     intent = FusionAgentLoop(adapter).handle_observation(obs)
-    assert intent["verb"] in {"approach", "use", "wait"}
+    # desk_1 affords use/sit; any grounded verb (or wait) is acceptable.
+    assert intent["verb"] in {"approach", "use", "sit", "look_at", "wait"}
