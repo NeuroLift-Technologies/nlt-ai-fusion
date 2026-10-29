@@ -203,7 +203,7 @@ def test_last_unchanged_pair_is_excluded_on_the_next_decision():
     assert ("use", "well") not in fake.offered
 
 
-def test_an_unchanged_pair_is_demoted_below_pairs_not_yet_chosen():
+def test_an_unchanged_pair_is_demoted_not_excluded():
     """Alternating use well / use plaza with no movement (the #135 engine loop) is broken up by
     ranking, not by exclusion: once chosen in this scene, `use well` ranks below every pair in
     its group not yet chosen and below every approach, but stays allowed (Josh, 2026-10-28:

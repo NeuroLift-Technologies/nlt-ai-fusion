@@ -1,7 +1,12 @@
 """Which choices a model sees first, and which it no longer sees (AGENT-LOOP-003 F3).
 
 A 0.6B model at temperature 0 takes the first option it is offered, and prompt wording does not
-change that (F2 measured it), so the bias is removed structurally:
+change that (F2 measured it), so the bias is removed structurally.
+
+Only five rules drop a (verb, target) pair: anti-repeat rules 1-3, the reach guard and blocked
+targets, each because the pair cannot produce anything new or cannot be carried out. Everything
+else that a visible target affords is offered, in ranked order; in particular, holding actions on
+targets that do not serve the goal are demoted, never dropped (Josh, 2026-10-28, decision 2).
 
 - **Ranking.** Visible entities are presented most goal-relevant first, then nearest, with their
   distance and relevance, instead of in engine order. Relevance comes from the F2 goal's needs.
@@ -36,12 +41,14 @@ change that (F2 measured it), so the bias is removed structurally:
   being in tier 3: an avatar may still choose to use the well (Josh, 2026-10-28: "demote them;
   never forbid them").
 - **Explore when the goal is not in view** (Josh, 2026-10-29: "if it has no goal then it should
-  explore"). When no visible entity is goal-relevant, or none the agent can still act on, tier 2
-  goes farthest first, so each move carries the agent toward the edge of what it can perceive and
-  new places come into view. The walk already under way (the last approach, still moving the
-  agent) heads tier 3, so a walk is finished before another visited target is picked; without
-  this the agent turned back halfway between two landmarks. No new verb and no reliance on the
-  engine's wander: the moves the ranking puts first are targeted `approach`es.
+  explore"). Exploring is a ranking, not a filter: it applies while no visible entity is
+  goal-relevant, or none the agent can still act on (each is out of reach or blocked), and ends as
+  soon as one is. While it applies, tier 1 is empty and tier 2 goes farthest first, so each move
+  carries the agent toward the edge of what it can perceive and new places come into view. The walk
+  already under way (the last approach, still moving the agent) heads tier 3, so a walk is finished
+  before another visited target is picked; without this the agent turned back halfway between two
+  landmarks. No new verb and no reliance on the engine's wander: the moves the ranking puts first
+  are targeted `approach`es.
 - **Reach guard.** The engine refuses any intent whose target is beyond 30 m of the avatar's live
   position when it executes (IntentIngress.RecheckTarget), while perception lists entities out to
   25 m. A walking avatar keeps moving while the decision is made, so a target perceived at 24 m
@@ -53,10 +60,11 @@ change that (F2 measured it), so the bias is removed structurally:
   which the agent is no closer to and no farther from it, still short of it, with nobody else
   holding it, mean the target cannot be reached from here (measured: the agent stopped 7.6 m
   short of a raised doorway, then chose `use` on it 9 times). One such decision is not enough:
-  with a model deciding, the next perception can come before the walk has started. Every pair on that target except `look_at` is left
-  out for the rest of the scene, within the remembered history. Ending up farther away is not
-  counted: with a model taking seconds to decide, the wander after a `look_at` can carry the
-  agent off before the approach executes, and counting that left only the well at the spawn.
+  with a model deciding, the next perception can come before the walk has started. Every pair on
+  that target except `look_at` is left out for the rest of the scene, within the remembered
+  history. Ending up farther away is not counted: with a model taking seconds to decide, the
+  wander after a `look_at` can carry the agent off before the approach executes, and counting
+  that left only the well at the spawn.
 
 `wait` is never dropped, so a model always has something to choose. Exclusions are computed from
 the current perception and the F1 history only; history is cleared when the engine restarts, and
@@ -215,15 +223,21 @@ def rank_options(
     verb_rank = {verb: index for index, verb in enumerate(acting)}
 
     def key(pair: tuple[str, str]) -> tuple[Any, ...]:
+        # Smaller sorts first. Element 0 is the tier; keys of different tiers, and in tier 3 of
+        # different groups (element 1), never get as far as comparing their later elements.
         verb, target = pair
         in_order = position.get(target, len(position))
         if target in goal_relevant and verb in verb_rank and not (
             verb == "approach" and target in visits
         ):
+            # Tier 1: verb order for the need, then entity ranking.
             return (0, verb_rank[verb], in_order)
         if verb == "approach" and target not in visits:
+            # Tier 2: farthest first while exploring, else entity ranking.
             return (1, -far.get(target, 0.0) if not goal_relevant else 0.0, in_order)
         if verb == "approach":
+            # Tier 3, approaches: the walk under way, then not yet chosen, then least recently
+            # visited, then farthest, then entity ranking.
             return (
                 2,
                 0,
@@ -233,6 +247,8 @@ def rank_options(
                 -far.get(target, 0.0),
                 in_order,
             )
+        # Tier 3, holding verbs (group 1) then look_at (group 2): not yet chosen, then verb
+        # order, then entity ranking. The False keeps the shape of the approach key.
         group = 1 if verb in _HOLDING_VERBS else 2
         return (2, group, False, pair in chosen, verb_rank.get(verb, len(verb_rank)), in_order)
 
