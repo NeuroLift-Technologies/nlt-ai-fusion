@@ -16,9 +16,13 @@ context into the worker thread (`asyncio.to_thread` copies context variables).
 
 from __future__ import annotations
 
+import logging
 import os
 import threading
+import time
 from contextvars import ContextVar
+
+logger = logging.getLogger(__name__)
 
 # Godot's own wait for a decision, in seconds (FusionHttpLink). Fusion must give up first, so
 # Godot always gets an answer instead of timing out itself.
@@ -111,10 +115,14 @@ def commit_decision() -> None:
 
 
 class ModelQuarantine:
-    """Counts timed-out decisions still running. While any is, the model is quarantined."""
+    """Counts timed-out decisions still running. While any is, the model is quarantined.
+
+    Entering and leaving quarantine each log one line (WARNING, then INFO), not one per call.
+    """
 
     def __init__(self) -> None:
         self._running = 0
+        self._since: float | None = None
         self._lock = threading.Lock()
 
     @property
@@ -122,12 +130,41 @@ class ModelQuarantine:
         with self._lock:
             return self._running > 0
 
+    @property
+    def running(self) -> int:
+        """How many timed-out decisions are still running."""
+        with self._lock:
+            return self._running
+
+    @property
+    def since(self) -> float | None:
+        """When the current quarantine began (Unix time), or None when there is none."""
+        with self._lock:
+            return self._since
+
+    def snapshot(self) -> tuple[float | None, int]:
+        """(since, running), read together so the two always agree."""
+        with self._lock:
+            return self._since, self._running
+
     def enter(self) -> None:
         """A decision timed out and is still running."""
         with self._lock:
             self._running += 1
+            if self._running == 1:
+                self._since = time.time()
+                logger.warning(
+                    "agent-loop model quarantined: a decision timed out and is still running; "
+                    "every new decision gets 503 until it returns or the process restarts"
+                )
 
     def leave(self) -> None:
         """A timed-out decision has returned."""
         with self._lock:
             self._running -= 1
+            if self._running == 0 and self._since is not None:
+                logger.info(
+                    "agent-loop model quarantine lifted after %.1f s",
+                    time.time() - self._since,
+                )
+                self._since = None

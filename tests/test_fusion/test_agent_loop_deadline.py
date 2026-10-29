@@ -12,6 +12,7 @@ from fastapi.testclient import TestClient
 from src.fusion import PROTOCOL_VERSION, LlamaCppAgentLoopDecision, TransformersAgentLoopDecision
 from src.fusion.agent_loop_deadline import (
     Abandonable,
+    ModelQuarantine,
     DecisionAbandoned,
     abandonable,
     decision_timeout,
@@ -21,6 +22,15 @@ from src.fusion.agent_loop_http import build_decision_source, create_app, select
 from src.fusion.agent_loop_memory import StatefulAgentLoopDecision
 
 AGENTS = frozenset({"avatar_1", "avatar_2"})
+# The status route answers loopback clients only; TestClient's default host is "testclient".
+LOOPBACK = ("127.0.0.1", 50000)
+STATUS_KEYS = {
+    "quarantined",
+    "quarantined_since",
+    "running_timed_out_calls",
+    "timeout_s",
+    "model_kind",
+}
 
 
 def perception(agent_id="avatar_1", tick=1):
@@ -98,7 +108,7 @@ def stuck_app(short_timeout):
     source = StuckSource()
     memory = StatefulAgentLoopDecision(source)
     app = create_app(decide=memory, registry=AGENTS)  # type: ignore[arg-type]
-    with TestClient(app) as client:
+    with TestClient(app, client=LOOPBACK) as client:
         yield client, source, memory
         source.release.set()
 
@@ -319,3 +329,62 @@ def test_an_abandoned_decision_is_not_remembered():
         restore(token)
     memory(perception(tick=2))
     assert memory.history("avatar_1") == ()
+
+
+def test_status_reports_no_quarantine_when_idle(short_timeout):
+    app = create_app(decide=StatefulAgentLoopDecision(approach), registry=AGENTS)
+    with TestClient(app, client=LOOPBACK) as client:
+        body = client.get("/agent-loop/status").json()
+    assert body == {
+        "quarantined": False,
+        "quarantined_since": None,
+        "running_timed_out_calls": 0,
+        "timeout_s": 0.2,
+        "model_kind": "injected",
+    }
+
+
+def test_status_shows_the_quarantine_while_the_stuck_call_runs_and_clears_after(stuck_app):
+    client, source, _ = stuck_app
+    assert client.post("/agent-loop/perception", json=perception()).status_code == 503
+    during = client.get("/agent-loop/status").json()
+    assert during["quarantined"] is True
+    assert during["running_timed_out_calls"] == 1
+    assert during["quarantined_since"] is not None
+
+    source.release.set()
+    assert source.returned.wait(timeout=5)
+    assert post_until_served(client, perception("avatar_2")).status_code == 200
+    after = client.get("/agent-loop/status").json()
+    assert after["quarantined"] is False
+    assert after["running_timed_out_calls"] == 0
+    assert after["quarantined_since"] is None
+
+
+def test_status_exposes_no_perception_or_agent_content(stuck_app):
+    client, _, _ = stuck_app
+    client.post("/agent-loop/perception", json=perception())
+    response = client.get("/agent-loop/status")
+    assert set(response.json()) == STATUS_KEYS
+    for leaked in ("avatar_1", "desk_1", "workplace_1", "position", "obs-1"):
+        assert leaked not in response.text
+
+
+def test_status_refuses_a_client_that_is_not_on_loopback(short_timeout):
+    app = create_app(decide=StatefulAgentLoopDecision(approach), registry=AGENTS)
+    with TestClient(app, client=("10.0.0.7", 50000)) as client:
+        assert client.get("/agent-loop/status").status_code == 403
+        # The decision route is unchanged: a remote client still gets its intent, as before.
+        assert client.post("/agent-loop/perception", json=perception()).status_code == 200
+
+
+def test_quarantine_logs_once_on_entering_and_once_on_leaving(caplog):
+    quarantine = ModelQuarantine()
+    with caplog.at_level("INFO", logger="src.fusion.agent_loop_deadline"):
+        quarantine.enter()
+        quarantine.enter()
+        quarantine.leave()
+        quarantine.leave()
+    levels = [record.levelname for record in caplog.records]
+    assert levels == ["WARNING", "INFO"]
+    assert quarantine.since is None and quarantine.running == 0

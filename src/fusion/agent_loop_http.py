@@ -17,6 +17,8 @@ Boundaries (docs/contracts/agent-loop-v1.md):
     other agentId gets 404 and no intent. Fusion never creates an avatar on demand.
   * ASFDK governance, live-world validation, and physical execution remain
     Godot's job; this server never claims execution.
+  * GET /agent-loop/status reports the quarantine, for a supervisor on this host
+    only: no perception data, no agent state.
   * Every decision is bounded by FUSION_AGENT_LOOP_TIMEOUT (default 15 s, always
     below Godot's 30 s). A decision that outlives it gets 503 and quarantines the
     model: every new request gets 503 at once until the stuck call returns
@@ -32,6 +34,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+from datetime import datetime, timezone
 from typing import Any, Callable, Mapping
 
 from fastapi import FastAPI, Request, Response
@@ -48,6 +51,12 @@ from .agent_loop_goals import with_goal
 from .agent_loop_registry import AgentRegistry, build_default_registry
 from .agent_loop_memory import DEFAULT_HISTORY_SIZE, StatefulAgentLoopDecision
 
+
+# Client addresses GET /agent-loop/status answers. The server binds 127.0.0.1, so this matters only
+# if the bind address changes, or behind a local proxy that sets X-Forwarded-For (uvicorn then
+# reports the forwarded client). A local proxy that does not set it makes every client look local;
+# the payload holds nothing sensitive.
+_LOOPBACK_HOSTS = frozenset({"127.0.0.1", "::1"})
 
 # Values of FUSION_AGENT_LOOP_MODEL.
 MODEL_KINDS = ("baseline", "gguf", "transformers")
@@ -117,9 +126,32 @@ def create_app(
     timeout = decision_timeout()
     app = FastAPI(title="nlt.agent-loop.v1 fusion endpoint", version=PROTOCOL_VERSION)
     loop = FusionAgentLoop(decide if decide is not None else build_decision_source(agents))
+    # An injected decision source is not one of FUSION_AGENT_LOOP_MODEL's kinds.
+    model_kind = selected_model() if decide is None else "injected"
 
     in_flight: set[str] = set()
     quarantine = ModelQuarantine()
+
+    @app.get("/agent-loop/status")
+    async def status(request: Request) -> Response:
+        """The quarantine state, for a supervisor on this host. No perception or agent data."""
+        if request.client is None or request.client.host not in _LOOPBACK_HOSTS:
+            return _error(403, "status is served on loopback only")
+        since, running = quarantine.snapshot()
+        body = {
+            "quarantined": since is not None,
+            "quarantined_since": (
+                datetime.fromtimestamp(since, tz=timezone.utc).isoformat()
+                if since is not None
+                else None
+            ),
+            "running_timed_out_calls": running,
+            "timeout_s": timeout,
+            "model_kind": model_kind,
+        }
+        import json as _json
+
+        return Response(content=_json.dumps(body), media_type="application/json")
 
     @app.post("/agent-loop/perception")
     async def perception(request: Request) -> Response:
@@ -226,8 +258,12 @@ def _error(status: int, reason: str) -> Response:
 
 def main() -> None:
     """Run with uvicorn. Port matches Godot FusionHttpLink.FusionEndpoint."""
+    import logging
+
     import uvicorn
 
+    # uvicorn configures only its own loggers; without this the quarantine's INFO line is lost.
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s:     %(name)s: %(message)s")
     uvicorn.run(
         create_app(),
         host="127.0.0.1",
