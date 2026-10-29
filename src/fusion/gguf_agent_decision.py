@@ -22,6 +22,7 @@ from .agent_loop_choices import (
     option_schemas,
     parse_decision,
 )
+from .agent_loop_deadline import raise_if_abandoned
 
 if TYPE_CHECKING:
     from .agent_loop_ranking import ChoiceGuidance
@@ -98,6 +99,8 @@ class LlamaCppAgentLoopDecision:
         choices = grounded_choices(observation, guidance)
 
         with self._inference_lock:
+            # Queued behind a call that timed out: the request is answered, so do not start.
+            raise_if_abandoned()
             response = self._model.create_chat_completion(
                 messages=[
                     {"role": "system", "content": self._SYSTEM_PROMPT},

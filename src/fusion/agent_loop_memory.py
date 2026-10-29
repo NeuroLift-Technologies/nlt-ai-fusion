@@ -24,6 +24,7 @@ from math import hypot
 from typing import Any, Callable, Mapping, Sequence
 
 from .agent_loop import validate_intent, validate_perception
+from .agent_loop_deadline import commit_decision
 
 # Where outcomes come from (see module docstring). Recorded so a later transport that does deliver
 # results can be told apart.
@@ -183,6 +184,9 @@ class StatefulAgentLoopDecision:
             intent = self._decide(observation, tuple(memory.records))
             # Validate before remembering: an intent the loop will refuse never reached the engine.
             validate_intent(intent, observation)
+            # Nor did one whose request already timed out (agent_loop_deadline). The outcome of
+            # the previous decision, resolved above from this real perception, is kept.
+            commit_decision()
             target_id = intent.get("targetId")
             target = None
             if target_id is not None:
