@@ -13,19 +13,19 @@
       "Renamed stall test to test_last_unchanged_pair_is_excluded_on_the_next_decision (it only excludes the last pair).",
       "Added xfail test test_an_unchanged_pair_is_not_reoffered_until_state_changes documenting the known rule-1 gap.",
       "Broadened live Qwen smoke test accepted-verb set to {approach, use, sit, look_at, wait}.",
-      "Wrote docs/AGENT-LOOP-003-acceptance-test-plan.md with setup, stimulus, expected behavior, measurable pass/fail criteria, and responsible layer per test.",
+      "Wrote docs/AGENT-LOOP-003-acceptance-test-plan.md with setup, stimulus, expected behavior, measurable pass/fail criteria, and responsible layer per test."
     ],
     "work_in_progress": [],
     "blockers": [
-      "Python interpreter and pytest are not installed in this sandbox (only Node.js tooling), so the new and existing tests could not be executed here. CC will run pytest.",
+      "Python interpreter and pytest are not installed in this sandbox (only Node.js tooling), so the new and existing tests could not be executed here. CC will run pytest."
     ],
     "decisions_made": [
       "Tests are isolated fakes (no real GGUF/Transformers model, no Godot runtime, no network); no production decision logic, prompts, ranking policy, Godot behavior, governance rules, or the nlt.agent-loop.v1 contract were modified.",
       "Live-model / Godot tests (Qwen smoke, F5 in-engine run, inference timeout) are documented as live-only in the plan and not substituted with mocks called end-to-end.",
-      "Branch kilo/agent-loop-003-acceptance-tests committed and pushed; draft PR opened for CC review and test execution.",
+      "Branch kilo/agent-loop-003-acceptance-tests committed and pushed; draft PR opened for CC review and test execution."
     ],
     "decisions_pending": [
-      "Joshua's sign-off on whether acceptance 4 must be model-driven only (brief §5.2) — out of scope for this test slice.",
+      "Joshua's sign-off on whether acceptance 4 must be model-driven only (brief §5.2) — out of scope for this test slice."
     ],
     "escalations": [],
     "next_agent_notes": "Run pytest tests/test_fusion/test_agent_loop_acceptance.py and the full tests/test_fusion/ suite in a Python 3.11 env. CI coverage gate is --cov-fail-under=40 (pytest.ini). The live Qwen smoke test skips unless NLT_AGENT_LOOP_GGUF_PATH is set. Address the xfail test when rule 1 is extended to suppress all unchanged pairs.",

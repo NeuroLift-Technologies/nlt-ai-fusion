@@ -63,6 +63,12 @@ def entity(entity_id, x, z=0.0, affordances=("approach", "use", "look_at"), occu
     }
 
 
+# A goal-relevant target kept in view by the rule-1 and rule-3 tests. With nothing goal-relevant
+# in view, explore mode (#136) offers only `approach`, which would hide the `use` / `look_at`
+# pairs those tests are about.
+OFFICE_DOOR = entity("door_6_office", 20.0)
+
+
 def perception(entities, tick=1, x=0.0, z=0.0, scene="open_world", agent_id=AGENT_ID):
     return {
         "protocolVersion": PROTOCOL_VERSION,
@@ -143,7 +149,7 @@ def test_repeated_unchanged_pair_is_excluded_from_grammar_on_next_decision():
         ['{"verb":"use","targetId":"well"}', '{"verb":"wait"}'],
     )
     obs1 = perception(
-        [entity("well", 6.0, affordances=("approach", "use", "look_at"))],
+        [entity("well", 6.0, affordances=("approach", "use", "look_at")), OFFICE_DOOR],
         tick=1,
         x=-5.0,
     )
@@ -152,7 +158,7 @@ def test_repeated_unchanged_pair_is_excluded_from_grammar_on_next_decision():
 
     # obs2: the avatar did not move, so "use well" changed nothing and must be dropped.
     obs2 = perception(
-        [entity("well", 6.0, affordances=("approach", "use", "look_at"))],
+        [entity("well", 6.0, affordances=("approach", "use", "look_at")), OFFICE_DOOR],
         tick=2,
         x=-5.0,
     )
@@ -181,7 +187,7 @@ def test_last_unchanged_pair_is_excluded_on_the_next_decision():
         ],
     )
     obs1 = perception(
-        [entity("well", 6.0, affordances=("approach", "use", "look_at"))],
+        [entity("well", 6.0, affordances=("approach", "use", "look_at")), OFFICE_DOOR],
         tick=1,
         x=-5.0,
     )
@@ -189,7 +195,7 @@ def test_last_unchanged_pair_is_excluded_on_the_next_decision():
     assert (intent1["verb"], intent1.get("targetId")) == ("use", "well")
 
     obs2 = perception(
-        [entity("well", 6.0, affordances=("approach", "use", "look_at"))],
+        [entity("well", 6.0, affordances=("approach", "use", "look_at")), OFFICE_DOOR],
         tick=2,
         x=-5.0,
     )
@@ -222,7 +228,7 @@ def test_an_unchanged_pair_is_not_reoffered_until_state_changes():
         ],
     )
     base = perception(
-        [entity("well", 6.0), entity("plaza", 8.0)],
+        [entity("well", 6.0), entity("plaza", 8.0), OFFICE_DOOR],
         tick=1,
         x=0.0,
     )
@@ -318,7 +324,9 @@ def test_options_ordered_goal_relevant_first_unvisited_then_look_at_wait_last():
 
 
 def test_looked_at_entity_is_not_offered_for_look_again_this_scene():
-    obs = perception([entity("plaza", 0.5), entity("well", 6.0)], tick=1, x=-5.0)
+    obs = perception(
+        [entity("plaza", 0.5), entity("well", 6.0), OFFICE_DOOR], tick=1, x=-5.0
+    )
     history = (record("look_at", "plaza", changed=True, tick=1),)
     choices = grounded_choices(obs, guide(obs, ("focus",), history))
     assert "plaza" not in choices.get("look_at", [])
@@ -349,7 +357,7 @@ def test_context_contains_goal_needs_and_what_changed_after_each_decision():
 def test_context_flows_into_model_prompt_but_not_into_engine_intent():
     registry = build_default_registry()
     decide, fake = model_with(registry, ['{"verb":"wait"}'])
-    obs = perception(tick=1)
+    obs = perception([], tick=1)
     decide(obs)
     message = json.loads(fake.calls[0]["messages"][1]["content"])
     assert message["context"]["goal"].startswith("start the task you have been putting off")
@@ -412,7 +420,7 @@ class FakeLlama:
 
     def create_chat_completion(self, **kwargs):
         self.calls.append(kwargs)
-        return {"choices": [{"message": {"content": self.content}}]
+        return {"choices": [{"message": {"content": self.content}}]}
 
 
 def test_decision_source_exception_is_fail_closed_by_http_endpoint():
