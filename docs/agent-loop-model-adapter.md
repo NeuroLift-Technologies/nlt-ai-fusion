@@ -76,13 +76,15 @@ prompt and the output grammar for each decision. Visible entities are listed goa
 then nearest, each with its `distance` in metres and `goalRelevant`. Five rules leave a pair out of
 what the model may output:
 
-- the last pair when it changed nothing (except staying seated at, or using, a goal-relevant target
-  the agent is still at);
+- the last pair when it changed nothing, except repeating `sit`, `use` or `rest` on a goal-relevant
+  target that is not a door or exit (`door_`, `exit_`) and is within 1.5 m of the agent
+  (`HOLD_RADIUS`): staying put there is the goal reached;
 - `approach X` within the 1 m arrival radius;
 - `look_at X` once X was looked at since entering the current scene (within the remembered history);
 - a target the avatar will be more than 30 m from when the intent executes, predicted from its
   velocity and the expected decision time (the engine's reach check);
-- a target the agent has twice stayed stuck short of (blocked), for the rest of the scene.
+- the `approach`, `sit`, `use` and `rest` pairs on a target the agent has twice stayed stuck short of
+  (blocked), for the rest of the scene; `look_at` on it stays allowed.
 
 Everything else is offered. `wait` is always allowed. Nothing here is sent to the engine. Measured
 effect and open decisions: brief §10-§12.
@@ -104,8 +106,9 @@ offers every allowed pair in that order:
 2. `approach` to targets not yet visited, farthest first when nothing goal-relevant can be acted on
    (exploring);
 3. everything else: the walk under way, then other approaches (least recently visited, then
-   farthest), then `sit`, `use` and `rest`, then `look_at`; within each group, a pair not yet chosen
-   in this scene comes first.
+   farthest), then holding actions (`sit`, `use`, `rest`; `rest`, `sit`, `use` when the need is
+   rest or quiet), then `look_at`; within each group, a pair not yet chosen in this scene comes
+   first.
 
 `wait` is last. Actions on targets that do not serve the goal are demoted, never left out. Without a
 model, the endpoint uses the goal baseline (`src/fusion/agent_loop_baseline.py`, AGENT-LOOP-003 F4),

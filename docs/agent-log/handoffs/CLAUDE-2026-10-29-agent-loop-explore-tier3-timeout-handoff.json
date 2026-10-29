@@ -7,7 +7,7 @@
     "repo": "NeuroLift-Technologies/nlt-ai-fusion",
     "branch": "ccr-100a7dbc-intpwq (+ ccr-100a7dbc-intpwq-timeout for #138)",
     "work_completed": [
-      "#136 (merged): exploring when nothing goal-relevant is in view (unvisited targets farthest first; the walk under way finished first), predictive reach guard (engine rechecks 30 m at execution, perception reaches 25 m), blocked targets, 1.5 m hold radius. This PR had no handoff of its own; it is recorded here.",
+      "#136 (merged): exploring when nothing goal-relevant is in view (unvisited targets farthest first; among visited targets, the walk under way finished first), predictive reach guard (engine rechecks 30 m at execution, perception reaches 25 m), blocked targets, 1.5 m hold radius. This PR had no handoff of its own; it is recorded here.",
       "#137 (Kilo, merged): fixed the acceptance tests so they run (unclosed brace in FakeLlama, perception([]) call, office door kept in view for rule-1/rule-3 tests, trailing commas in the handoff JSON).",
       "#139 (merged), Josh's handoff item A: tier 3 ranks approaches (least recently visited, then farthest), then sit/use/rest, then look_at, with novelty within each group. #136's exploring exclusion became a demotion (decision 2: demote, never forbid). Blocked targets: two stalls needed, holding verbs only beyond 3 m, moving farther away and targets someone else took do not count. Kilo's xfail alternation test is now a passing demotion test.",
       "#138 (merged), item B: FUSION_AGENT_LOOP_TIMEOUT (default 15 s, must be > 0 and < Godot's 30 s), 503 + model quarantine, abandoned decisions write no memory (commit/abandon compare-and-set under one lock), cancelled requests quarantine too, Transformers adapter locked, FUSION_AGENT_LOOP_MODEL = baseline | gguf | transformers failing at startup otherwise.",
@@ -28,7 +28,7 @@
       "Josh: the door_4_home engine anchor on raised ground (engine-side; reported, not changed)."
     ],
     "escalations": [],
-    "next_agent_notes": "Read brief §12 first. Fusion side of AGENT-LOOP-003 F0-F4 plus the time limit is merged. The baseline passes 4a; no model passes 4b reliably (0.6B 2/5 runs, 1.7B 0/2, 3B 1/2). Unexplained: Qwen3-1.7B chose the reachable office door 0/7 in the engine but 12/12 offline. Inside the office, a ~15 s decision lands one perception late, so a model avatar hops between chairs (latency, not ranking). Engine benchmark tooling used: headless Godot 4.7.2 .NET with NLT_AGENT_LOOP_ENABLED=1, NLT_AGENT_LOOP_AGENT_ID=stay_alert_001, a logging proxy between Godot and Fusion; scripts lived in the session scratchpad and are not in the repo.",
+    "next_agent_notes": "Read brief §12 first. Fusion side of AGENT-LOOP-003 F0-F4 plus the time limit is merged. The baseline passes 4a; no model met 4b. Office reached from the spawn (a step toward 4b, not 4b itself): 0.6B 2/5 runs, 1.7B 0/2, 3B 1/2. Unexplained: Qwen3-1.7B chose the reachable office door 0/7 in the engine but 12/12 offline. Inside the office, a ~15 s decision lands one perception late, so a model avatar hops between chairs (latency, not ranking). Engine benchmark tooling used: headless Godot 4.7.2 .NET with NLT_AGENT_LOOP_ENABLED=1, NLT_AGENT_LOOP_AGENT_ID=stay_alert_001, a logging proxy between Godot and Fusion; scripts lived in the session scratchpad and are not in the repo.",
     "files_modified": [
       "src/fusion/agent_loop_ranking.py",
       "src/fusion/agent_loop_deadline.py",
@@ -51,6 +51,6 @@
       "Separate NLT Code Reviewer agent on #138 and #139; Josh's review (Vibe) approved #138 and requested three doc changes on #139, all addressed."
     ],
     "tests_passing": true,
-    "pr_url": "https://github.com/NeuroLift-Technologies/nlt-ai-fusion/pull/138, https://github.com/NeuroLift-Technologies/nlt-ai-fusion/pull/139"
+    "pr_url": "https://github.com/NeuroLift-Technologies/nlt-ai-fusion/pull/139"
   }
 }

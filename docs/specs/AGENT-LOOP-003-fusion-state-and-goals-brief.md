@@ -288,7 +288,8 @@ Same setup for each run: Fusion `main` plus the change named, Qwen3-0.6B Q8_0, `
   larger-model comparison with no change to the default model.
 
 ### 12.2 What changed
-- #136: exploring (unvisited targets farthest first, the walk under way finished first), the reach
+- #136: exploring (unvisited targets farthest first; among visited ones, the walk under way is
+  finished before another is picked), the reach
   guard (the engine rechecks a 30 m reach at execution while perception reaches 25 m), blocked
   targets, and a 1.5 m hold radius for staying seated.
 - #137 (Kilo): acceptance tests, with fixes so they run.
@@ -303,7 +304,7 @@ Same setup for each run: Fusion `main` plus the change named, Qwen3-0.6B Q8_0, `
 | | baseline | Qwen3-0.6B | Qwen3-1.7B | Qwen2.5-3B Q4 |
 |---|---|---|---|---|
 | runs | 1 | 5 | 2 | 2 |
-| office reached from the spawn | yes, decision 14 | 2/5 | 0/2 | 1/2 (decision 7) |
+| office reached from the spawn (not 4b by itself) | yes, decision 14 | 2/5 | 0/2 | 1/2 (decision 7) |
 | first-ranked option taken | 100% | 12-34% | 26-27% | 30-64% |
 | goal chosen when it could be acted on | 9/9 | 9/9 | 0/7 | 3/4 |
 | decision p50 / p95 | 0 / 0 s | 3-4 / 6-15 s | 10 / 13-21 s | 10-12 / 13-31 s |
@@ -312,7 +313,7 @@ Offline, on 12 recorded perceptions per stratum with no history, all three model
 door 12/12 when it was in view (p95 2.6, 6.0 and 7.1 s with 4 threads).
 
 ### 12.4 Reading
-- The baseline passes 4a. No model passes 4b reliably; the samples are small.
+- The baseline passes 4a. No model met 4b; office reach above is a necessary step, not 4b itself, and the samples are small.
 - Qwen3-0.6B no longer stays at the spawn, but can spend 10-15 decisions there on `use well`: it
   rarely takes option 1, so a demoted pair is still chosen. Within decision 2 the ranking cannot
   stop that; this is the model's limit, not the case for `explore`.
