@@ -214,3 +214,65 @@ Same setup for each run: Fusion `main` plus the change named, Qwen3-0.6B Q8_0, `
   1. Keep the new prompt? It is faster and goal-directed when the goal is in view, and it stalls the avatar at the spawn when the goal is not.
   2. How the agent explores when nothing goal-relevant is in view. Fusion has no verb for it (no `explore` verb, §8 decision 1). Options: in Fusion, offer only non-holding choices (`look_at`, `approach`) when nothing goal-relevant is visible, so the engine's wander resumes; or in the engine, a spawn or perception range that keeps a goal-relevant door in view (§5.1 option b).
   3. F4 faces the same question: its baseline starts with "approach a door", and from the spawn no office door is in range.
+
+## 11. Ranked options and the F4 baseline (handoff from Josh, 2026-10-29)
+
+### 11.1 Josh's decisions (2026-10-29)
+1. Keep the #135 prompt (no verbs named).
+2. Exploration lives in Fusion. No engine spawn or perception-range change; do not rely on the engine's wander via non-holding choices (`wait` holds still, 2026-10-21).
+3. No contract change in this PR; `explore` is a future v1.1 decision.
+4. Qwen 0.6B follows list order, not the goal, so Fusion's ranking decides what comes first.
+
+### 11.2 What changed
+- **Ranked options (A).** `guide()` now also returns `options`: every allowed `(verb, target)` pair, best first:
+  1. pairs on goal-relevant targets, in the verb order `sit`, `use`, `rest`, `approach` (`rest` first for a rest or quiet need); an `approach` to a goal-relevant target already visited drops to tier 3;
+  2. `approach` to targets not visited since entering the scene (visited: an `approach`, `use`, `sit` or `rest` on it in the per-agent history);
+  3. everything else, `look_at` included.
+  `wait` comes last. The model input lists the best 16 options in that order, in the output's own shape, then `wait` (`MAX_LISTED_OPTIONS`: a real office allowed 61 pairs and took the prompt to 1712 of 2048 tokens; capped, the largest is 1123). With guidance present, the GGUF grammar offers every allowed pair, one schema per option in the same order (`option_schemas`).
+- **Rule-1 fix.** Rule 1 no longer drops an unchanged `sit`, `rest` or `use` on a goal-relevant target the agent is already within 1 m of. Doors and exits are not exempt: an unchanged `use` on one is a failed transition. Holding still there is the goal reached, and the engine treats the repeat as a no-op (`AvatarCharacter.ApplyInteraction`). Before the fix, the baseline alternated between two desk chairs (verified in engine, run `baseline-f4`).
+- **F4 baseline (C).** New `src/fusion/agent_loop_baseline.py`, `goal_baseline(registry)`, takes the first-ranked option, else `wait`. It is now the endpoint's decision source when no GGUF model is configured, replacing the old "approach the first visible entity" fallback.
+- Unchanged: the system prompt, the schema, and what reaches the engine (verb and target only).
+
+### 11.3 Results (headless Godot 4.7.2 .NET, CPU, Claude Code cloud session; frames not rendered)
+
+**All results below are from the final code of this commit (verified).**
+
+**B. Offline, stratified (verified).** 12 real engine perceptions per stratum, the real GGUF adapter through `with_goal`, empty history.
+
+| Stratum | Qwen chose | Picked option 1 | Goal-directed |
+|---|---|---|---|
+| Spawn (near spawn, only `plaza`/`well` in view) | `approach well` 5, `look_at plaza` 4, `approach plaza` 3 | 8/12 | 0/12 (no goal in view) |
+| Goal not in view | `approach` unvisited doors 12 | 12/12 | 0/12 (no goal in view) |
+| Goal in view | `use door_6_office` 11, `approach door_6_office` 1 | 11/12 | 12/12 |
+
+**C. Acceptance 4a with the F4 baseline (verified, headless, 300 s).** From the spawn: approach `plaza` and `well`, `use plaza` twice, then `approach door_7_shop` once it came into view. At the plaza's west edge `door_1_office` came into view, and the baseline walked to it with `use` (9 decisions). Transit `open_world -> workplace_2`, walk to `desk_chair_2`, `sit`, and stay seated for the remaining 120 decisions with no oscillation. All 134 intents were accepted. **4a: passed headless.** Not yet run on the dev PC (F5). Caveat: leaving the spawn depends on `door_7_shop` and `door_1_office` reaching the 25 m perception edge from the plaza's west side.
+
+**D. Qwen in engine (verified, 240 s).**
+- Choices: `use well` 45, `use plaza` 5, `look_at plaza` 4, `approach plaza` 3, `look_at well` 2, `look_at door_5_home` 1, `wait` 1. All 61 accepted. p50 2.37 s, p95 3.88 s.
+- **The avatar did not reach the office door. It looped at the spawn.**
+- Replaying the logged run through the same history logic:
+  - option 1 was a tier-3 `use well` or `use plaza` in 40 of 61 decisions: every visible target had already been visited (uses fill the 8-entry history);
+  - Qwen picked option 1 in 34 of 61.
+  - An earlier run before the review fixes gave the same picture (54 decisions, option 1 tier 3 in 36, Qwen took option 1 in 28; of 7 times an unvisited door was option 1, it took it once).
+
+**4b: not met.**
+
+### 11.4 Stop point (Josh's rule: loops at spawn after A)
+- The avatar loops at the spawn after A, with all visible targets visited for most of the run. Per Josh's instruction, this is reported, not worked around.
+- It is the case for an `explore` intent: from the spawn, Fusion has no way to send the agent toward somewhere it cannot see.
+- The baseline escaped only through the geometry above, and only because it always takes option 1. Qwen does not reliably do that once history is involved.
+- **Needs Josh:** the `explore` intent (v1.1), or another way out of the spawn.
+- Rule 3 and `wait` remain open; A is now measured.
+
+### 11.5 Review (separate NLT Code Reviewer agent) and known limits
+- No blockers. A property check over 5,000 random perceptions found the options always equal the allowed pairs, each parses, and none is excluded.
+- Fixed from the review:
+  - the door exemption;
+  - the ping-pong between approach-only goal targets;
+  - `ChoiceGuidance.options` is now required;
+  - "visited" is documented as chosen, not reached;
+  - the prompt-size cap;
+  - eight more tests.
+- Known limits:
+  - History carries no engine result, so a `sit` the engine rejected within 1 m of a goal target would be retried. Not reachable today for free targets that list the affordance.
+  - "Visited" counts a choice even when the walk was interrupted.

@@ -10,7 +10,7 @@ the engine already said the target cannot do.
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING, Any, Mapping
+from typing import TYPE_CHECKING, Any, Mapping, Sequence
 
 if TYPE_CHECKING:
     from .agent_loop_ranking import ChoiceGuidance
@@ -35,6 +35,12 @@ SYSTEM_PROMPT = (
 )
 
 
+# How many ranked options the model input lists, before wait. A room full of seats can allow 60+
+# pairs, which took a real office prompt to 1712 of the adapter's 2048 tokens; the model acts on
+# the first options anyway. The output grammar still offers every allowed pair.
+MAX_LISTED_OPTIONS = 16
+
+
 def _ordered_entities(
     observation: Mapping[str, Any], guidance: ChoiceGuidance | None
 ) -> list[Mapping[str, Any]]:
@@ -55,7 +61,8 @@ def model_input(
 
     With `guidance` (F3), entities come most goal-relevant first, each with its distance and
     relevance, and coordinates and velocity are left out: a small model cannot use raw positions,
-    and they double its prompt (brief §10.4).
+    and they double its prompt (brief §10.4). `options` lists the best allowed decisions, up to
+    `MAX_LISTED_OPTIONS`, in the output's own shape, ending with wait.
     """
     if guidance is not None:
         message: dict[str, Any] = {
@@ -70,6 +77,13 @@ def model_input(
                     "occupied": entity["occupied"],
                 }
                 for entity in _ordered_entities(observation, guidance)
+            ],
+            "options": [
+                *(
+                    {"verb": verb, "targetId": target}
+                    for verb, target in guidance.options[:MAX_LISTED_OPTIONS]
+                ),
+                {"verb": "wait"},
             ],
         }
         if context is not None:
@@ -135,6 +149,32 @@ def decision_schemas(choices: Mapping[str, list[str]]) -> list[dict[str, Any]]:
                     "additionalProperties": False,
                 }
             )
+    return schemas
+
+
+def option_schemas(options: Sequence[tuple[str, str]]) -> list[dict[str, Any]]:
+    """JSON schemas, one per ranked (verb, target) option in the given order, then wait.
+
+    Offers the same decisions as `decision_schemas` over the same allowed pairs, but in rank order,
+    so the grammar presents the best option first (AGENT-LOOP-003 F3).
+    """
+    schemas: list[dict[str, Any]] = [
+        {
+            "type": "object",
+            "properties": {"verb": {"const": verb}, "targetId": {"const": target}},
+            "required": ["verb", "targetId"],
+            "additionalProperties": False,
+        }
+        for verb, target in options
+    ]
+    schemas.append(
+        {
+            "type": "object",
+            "properties": {"verb": {"const": "wait"}},
+            "required": ["verb"],
+            "additionalProperties": False,
+        }
+    )
     return schemas
 
 

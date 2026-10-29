@@ -19,6 +19,7 @@ from .agent_loop_choices import (
     decision_schemas,
     grounded_choices,
     model_input,
+    option_schemas,
     parse_decision,
 )
 
@@ -93,7 +94,7 @@ class LlamaCppAgentLoopDecision:
         validate_perception(observation)
         message = model_input(observation, context, guidance)
         # Constrain generation to the decisions this perception allows: wait, or a verb with a
-        # visible target that lists it among its affordances.
+        # visible target that lists it among its affordances. With guidance, offered best first.
         choices = grounded_choices(observation, guidance)
 
         with self._inference_lock:
@@ -113,7 +114,11 @@ class LlamaCppAgentLoopDecision:
                 max_tokens=48,
                 response_format={
                     "type": "json_object",
-                    "schema": {"oneOf": decision_schemas(choices)},
+                    "schema": {
+                        "oneOf": option_schemas(guidance.options)
+                        if guidance is not None
+                        else decision_schemas(choices)
+                    },
                 },
             )
 

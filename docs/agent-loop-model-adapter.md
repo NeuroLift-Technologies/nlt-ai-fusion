@@ -46,7 +46,7 @@ to the engine. A perception whose tick goes backwards (engine restart) clears th
 
 The wrapped source receives `(observation, history)`. With `FUSION_GGUF_MODEL` set, the GGUF
 model gets the recent history (with the agent's goal) in its prompt; see the next section. The
-rule-based fallback is adapted with `ignore_history` and decides as before. The model's choice is
+goal baseline (F4) uses the same ranking and takes the first option. The model's choice is
 also constrained by the history (AGENT-LOOP-003 F3); see "Ranking and anti-repeat" below.
 
 ## Goal and recent history in the prompt
@@ -55,7 +55,7 @@ With a model configured, each decision's prompt also carries a `context`
 (`src/fusion/agent_loop_goals.py`, AGENT-LOOP-003 F2): a short goal and one or two needs derived
 from the state of the Avatar registered under the perception's `agentId`, and the agent's last
 four decisions with whether anything changed after each. The goal is read from the Avatar without
-changing it. Nothing in `context` is sent to the engine. The rule-based fallback ignores it.
+changing it. Nothing in `context` is sent to the engine. The goal baseline (F4) does not use it.
 
 ## Ranking and anti-repeat
 
@@ -69,6 +69,12 @@ the remembered history). `wait` is always allowed. Nothing here is sent to the e
 The system prompt names no verb: naming them primed Qwen3-0.6B onto `look_at` in every case
 measured. With F3 guidance, the model's input carries no coordinates or velocity, only each
 entity's id, kind, distance, relevance, affordances and occupancy (brief §10.4).
+
+The input also lists `options`: the best 16 allowed decisions, best first (goal-relevant targets, then
+`approach` to targets not yet visited, then everything else, with `wait` last), and the output
+grammar offers every allowed pair in that order. Without a model, the endpoint uses the goal baseline
+(`src/fusion/agent_loop_baseline.py`, AGENT-LOOP-003 F4), which takes the first option. Results:
+brief §11.
 
 ## Transformers/Safetensors path
 

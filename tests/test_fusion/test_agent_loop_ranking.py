@@ -200,11 +200,16 @@ class FakeLlama:
         self.calls.append(kwargs)
         return {"choices": [{"message": {"content": self.content}}]}
 
-    def look_at_targets(self, index):
+    def options(self, index):
+        """(verb, target) pairs the grammar offers, in order; wait has no target."""
+        pairs = []
         for schema in self.calls[index]["response_format"]["schema"]["oneOf"]:
-            if schema["properties"]["verb"].get("const") == "look_at":
-                return schema["properties"]["targetId"]["enum"]
-        return []
+            target = schema["properties"].get("targetId", {})
+            pairs.append((schema["properties"]["verb"]["const"], target.get("const")))
+        return pairs
+
+    def look_at_targets(self, index):
+        return [target for verb, target in self.options(index) if verb == "look_at"]
 
 
 def test_gguf_grammar_drops_a_look_already_taken():
@@ -231,3 +236,169 @@ def test_looks_from_before_a_trip_inside_do_not_count_after_coming_back():
         record("sit", "desk_chair_1", changed=True, scene="office_1"),
     )
     assert ("look_at", "plaza") not in guide(observation, FOCUS, history).excluded
+
+
+SPAWN_VIEW = [entity("plaza", 0.5), entity("well", 6.0)]
+
+
+def test_at_the_spawn_the_first_option_approaches_the_nearest_unvisited_target():
+    # plaza is within the arrival radius, so approaching it is excluded; well is unvisited.
+    assert guide(perception(SPAWN_VIEW), FOCUS, ()).options[0] == ("approach", "well")
+
+
+def test_after_visiting_a_target_the_next_unvisited_one_comes_first():
+    observation = perception([entity("plaza", 6.0), entity("well", 0.5)], x=0.0)
+    history = (record("approach", "well", changed=True),)
+    assert guide(observation, FOCUS, history).options[0] == ("approach", "plaza")
+
+
+def test_a_goal_relevant_target_comes_before_any_unvisited_one():
+    options = guide(perception(PLAZA_VIEW), FOCUS, ()).options
+    assert options[0] == ("use", "door_1_office")
+    assert options[1] == ("approach", "door_1_office")
+    assert options[2] == ("approach", "well")
+
+
+def test_inside_the_office_sitting_at_the_desk_comes_first():
+    view = [
+        entity("desk_1", 2.0, affordances=("use", "approach", "look_at")),
+        entity("desk_chair_1", 2.5, affordances=("sit", "approach", "look_at")),
+        entity("sofa_1", 1.5, affordances=("sit", "rest", "approach", "look_at")),
+    ]
+    options = guide(perception(view, scene="office_1"), FOCUS, ()).options
+    assert options[:2] == (("sit", "desk_chair_1"), ("use", "desk_1"))
+
+
+def test_a_need_for_rest_puts_rest_first():
+    view = [entity("sofa_1", 2.0, affordances=("sit", "rest", "approach", "look_at"))]
+    options = guide(perception(view, scene="home_1"), ("rest", "quiet"), ()).options
+    assert options[0] == ("rest", "sofa_1")
+
+
+def test_visits_from_another_scene_do_not_count():
+    history = (
+        record("approach", "well", changed=True),
+        record("sit", "chair_1", changed=True, scene="home_1"),
+    )
+    assert guide(perception(SPAWN_VIEW), FOCUS, history).options[0] == ("approach", "well")
+
+
+def test_input_and_grammar_offer_the_ranked_options_with_wait_last():
+    fake = FakeLlama(content='{"verb":"approach","targetId":"well"}')
+    decide = StatefulAgentLoopDecision(
+        with_goal(LlamaCppAgentLoopDecision("unused.gguf", model=fake), build_default_registry())
+    )
+    decide(perception(SPAWN_VIEW))
+
+    offered = fake.options(0)
+    message = json.loads(fake.calls[0]["messages"][1]["content"])
+    listed = [(o["verb"], o.get("targetId")) for o in message["options"]]
+    assert offered == listed
+    assert offered[0] == ("approach", "well")
+    assert offered[-1] == ("wait", None)
+
+
+def test_staying_seated_at_a_goal_relevant_chair_is_not_dropped():
+    view = [
+        entity("desk_chair_1", 0.4, affordances=("sit", "approach", "look_at")),
+        entity("desk_chair_2", 3.0, affordances=("sit", "approach", "look_at")),
+    ]
+    history = (record("sit", "desk_chair_1", changed=False, scene="office_1"),)
+    options = guide(perception(view, scene="office_1"), FOCUS, history).options
+    assert options[0] == ("sit", "desk_chair_1")
+
+
+def test_an_unchanged_sit_away_from_the_target_is_still_dropped():
+    view = [entity("desk_chair_1", 3.0, affordances=("sit", "approach", "look_at"))]
+    history = (record("sit", "desk_chair_1", changed=False, scene="office_1"),)
+    guidance = guide(perception(view, scene="office_1"), FOCUS, history)
+    assert ("sit", "desk_chair_1") in guidance.excluded
+
+
+def test_an_unchanged_door_use_at_the_door_is_still_dropped():
+    # Using a door is a transition; one that changed nothing failed and must not repeat forever.
+    observation = perception([entity("door_1_office", 0.5), entity("well", 6.0)])
+    history = (record("use", "door_1_office", changed=False),)
+    assert ("use", "door_1_office") in guide(observation, FOCUS, history).excluded
+
+
+def test_staying_at_a_chair_that_does_not_serve_the_goal_is_dropped():
+    view = [entity("chair_1", 0.4, affordances=("sit", "approach", "look_at"))]
+    history = (record("sit", "chair_1", changed=False, scene="home_1"),)
+    assert ("sit", "chair_1") in guide(perception(view, scene="home_1"), FOCUS, history).excluded
+
+
+@pytest.mark.parametrize("verb", ["approach", "look_at"])
+def test_only_holding_verbs_are_exempt(verb):
+    view = [entity("desk_1", 3.0, affordances=("use", "approach", "look_at"))]
+    history = (record(verb, "desk_1", changed=False, scene="office_1"),)
+    assert (verb, "desk_1") in guide(perception(view, scene="office_1"), FOCUS, history).excluded
+
+
+def test_third_tier_puts_acting_verbs_before_visited_approaches_and_look_at_last():
+    observation = perception([entity("well", 6.0), entity("plaza", 3.0)], x=0.0)
+    history = (record("approach", "well", changed=True), record("approach", "plaza", changed=True))
+    options = guide(observation, FOCUS, history).options
+    assert options == (
+        ("use", "plaza"),
+        ("use", "well"),
+        ("approach", "plaza"),
+        ("approach", "well"),
+        ("look_at", "plaza"),
+        ("look_at", "well"),
+    )
+
+
+def test_a_visited_goal_target_that_only_affords_approach_does_not_ping_pong():
+    view = [
+        entity("shore_0", 6.0, affordances=("approach", "look_at")),
+        entity("shore_1", 9.0, affordances=("approach", "look_at")),
+        entity("well", 12.0),
+    ]
+    history = (
+        record("approach", "shore_0", changed=True),
+        record("approach", "shore_1", changed=True),
+    )
+    options = guide(perception(view), ("rest", "quiet"), history).options
+    assert options[0] == ("approach", "well")
+
+
+@pytest.mark.parametrize(
+    ("view", "history", "needs"),
+    [
+        (PLAZA_VIEW, (), FOCUS),
+        (PLAZA_VIEW, (record("look_at", "well", changed=True),), FOCUS),
+        (SPAWN_VIEW, (record("approach", "well", changed=False),), ("rest", "quiet")),
+        ([entity("sofa_1", 0.5, affordances=("sit", "rest", "approach", "look_at"),
+                 occupied=True)], (), ("rest",)),
+    ],
+)
+def test_options_are_exactly_the_allowed_pairs_and_each_parses(view, history, needs):
+    observation = perception(view)
+    guidance = guide(observation, needs, history)
+    choices = grounded_choices(observation, guidance)
+    allowed = {(verb, target) for verb, targets in choices.items() for target in targets}
+    assert set(guidance.options) == allowed
+    assert len(guidance.options) == len(allowed)
+    for verb, target in guidance.options:
+        decision = json.dumps({"verb": verb, "targetId": target})
+        assert parse_decision(decision, choices, ValueError) == {"verb": verb, "targetId": target}
+
+
+def test_input_lists_at_most_the_best_options_while_the_grammar_offers_all():
+    from src.fusion.agent_loop_choices import MAX_LISTED_OPTIONS
+
+    seats = [
+        entity(f"chair_{i}", 2.0 + i, affordances=("sit", "approach", "look_at"))
+        for i in range(10)
+    ]
+    fake = FakeLlama(content='{"verb":"sit","targetId":"chair_0"}')
+    decide = StatefulAgentLoopDecision(
+        with_goal(LlamaCppAgentLoopDecision("unused.gguf", model=fake), build_default_registry())
+    )
+    decide(perception(seats, scene="cafe_1"))
+
+    message = json.loads(fake.calls[0]["messages"][1]["content"])
+    assert len(message["options"]) == MAX_LISTED_OPTIONS + 1
+    assert message["options"][-1] == {"verb": "wait"}
+    assert len(fake.options(0)) == 30 + 1
