@@ -79,6 +79,25 @@ stale, or unavailable decisions fail closed. The endpoint is loopback-only and d
 ASFDK governance or physical execution. The existing `nlt.state-feed.v1` is a separate observer
 feed, not this control protocol.
 
+#### Agent-loop status (AGENT-LOOP-003, 2026-10-29)
+
+- **Decision source.** Fusion registers each agent (F0), remembers its last decisions and their
+  outcomes (F1), derives a goal from the Avatar's state (F2), and ranks the choices a model is
+  shown (F3). Without a model, the goal baseline takes the first-ranked option (F4).
+- **Ranking, not filtering.** Only five rules drop a choice: three anti-repeat rules, a reach guard
+  for targets the avatar will have walked out of reach of, and targets it has been stuck short of
+  twice. Everything else is offered in ranked order: goal-relevant targets, then places not yet
+  visited, then the rest, approaches before holding actions. Actions on targets that do not serve
+  the goal are demoted, never forbidden. With nothing goal-relevant in view, the ranking explores:
+  unvisited places farthest first, and a walk under way is finished first.
+- **Bounded decisions.** Each decision is limited by `FUSION_AGENT_LOOP_TIMEOUT` (15 s). A model
+  call that overruns gets 503 and quarantines the model until it returns.
+- **Measured** (headless Godot 4.7.2, 240 s, CPU): the goal baseline walks from the spawn into the
+  office and sits at a desk, with no engine rejections. Qwen3-0.6B reached the office in 2 of 5
+  runs; it takes the first-ranked option only 12-34% of the time, so the model, not the ranking,
+  limits it. Qwen3-1.7B and Qwen2.5-3B were not reliably better and are about 3× slower. Details:
+  [AGENT-LOOP-003 brief §12](docs/specs/AGENT-LOOP-003-fusion-state-and-goals-brief.md).
+
 ### JavaScript dependency boundaries
 
 The repository currently has multiple JavaScript package-manager surfaces:
@@ -133,7 +152,7 @@ This simulation approach addresses both gaps through authentic experiential lear
 **Role:** Coach, therapist, and assistant operating IN the simulation environment alongside the Avatar
 
 #### Phase 3: Simulation Training
-**Environment:** Sims/RPG-style virtual world — the target physical runtime is **[Godot 4.7.2 in `nlt-world-engine`](https://github.com/NeuroLift-Technologies/nlt-world-engine/tree/main/world-engine-godot)**. `WorldEngine/` retains the UE 5.8 reference implementation. The transport-neutral agent-loop contract is defined, and Fusion exposes a loopback HTTP endpoint at `POST /agent-loop/perception`. Live Godot ↔ Fusion transport and runtime dispatch are not yet wired.
+**Environment:** Sims/RPG-style virtual world — the target physical runtime is **[Godot 4.7.2 in `nlt-world-engine`](https://github.com/NeuroLift-Technologies/nlt-world-engine/tree/main/world-engine-godot)**. `WorldEngine/` retains the UE 5.8 reference implementation. The transport-neutral agent-loop contract is defined, and Fusion exposes a loopback HTTP endpoint at `POST /agent-loop/perception`. With Godot's opt-in loop enabled, the two run end to end over loopback HTTP; see "Agent-loop status" above.
 
 **Scenario Categories:**
 - **Workplace:** HR compliance, meetings, project management, performance reviews
@@ -187,7 +206,7 @@ This simulation approach addresses both gaps through authentic experiential lear
 
 - The UE WorldEngine is the retained reference for Mass Entity population, StateTree behavior, Smart Objects, deterministic tick, and RL/PPO training (Learning Agents plugin); it is not the target runtime.
 - The retained UE reference's in-engine **LLM control path** (`UMLInferenceBridgeSubsystem` in nlt-world-engine) drives `AAvatarAIController::ExecuteLLMCommand` directly — the model controls the actor inside the engine, not through the public web server.
-- Fusion's transport-neutral agent-loop contract is documented in [`docs/architecture.md`](docs/architecture.md); runtime wiring and transport selection remain deferred.
+- Fusion's transport-neutral agent-loop contract is documented in [`docs/architecture.md`](docs/architecture.md); the Godot runtime reaches it over loopback HTTP (opt-in), and no other transport is selected yet.
 
 UE-side plugin/tooling details: see the **UE Plugins Enabled** table and subsystem docs in [`nlt-world-engine/README.md`](https://github.com/NeuroLift-Technologies/nlt-world-engine).
 

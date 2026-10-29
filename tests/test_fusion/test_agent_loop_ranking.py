@@ -679,3 +679,51 @@ def test_a_seated_agent_that_drifts_just_past_the_arrival_radius_stays_seated():
     history = (record("sit", "desk_chair_2", changed=False, scene="office_1"),)
     options = guide(perception(view, scene="office_1"), FOCUS, history).options
     assert options[0] == ("sit", "desk_chair_2")
+
+
+def office_view():
+    """The office as the engine perceives it on entry (workplace_2, 20 entities, 61 allowed pairs
+    for a focus goal), measured 2026-10-29: the same ids and affordances, positions simplified. If
+    the engine's office changes, update this to match."""
+    seats = [f"desk_chair_{n}" for n in range(1, 7)] + [f"meeting_chair_{n}" for n in range(1, 5)]
+    tables = ["meeting_table_1"] + [f"desk_{n}" for n in range(1, 7)] + ["whiteboard_1"]
+    view = [entity("exit_workplace_2", 9.0)]
+    view += [entity(s, 2.0 + i, affordances=("sit", "approach", "look_at"))
+             for i, s in enumerate(seats)]
+    view += [entity(t, 2.5 + i, affordances=("use", "approach", "look_at"))
+             for i, t in enumerate(tables)]
+    view += [entity("sofa_1", 7.0, affordances=("sit", "rest", "approach", "look_at"))]
+    return view
+
+
+def test_the_listed_options_are_the_best_ranked_so_no_goal_pair_gives_way_to_another():
+    from src.fusion.agent_loop_choices import MAX_LISTED_OPTIONS, option_schemas
+
+    observation = perception(office_view(), scene="workplace_2")
+    guidance = guide(observation, FOCUS, ())
+    assert len(guidance.options) == 61
+    goal_pairs = [pair for pair in guidance.options if pair[1] in guidance.goal_relevant]
+    # More goal-relevant pairs than the input lists: some are always left out of the listing,
+    # but only goal-relevant ones, and the output grammar still offers every pair.
+    assert len(goal_pairs) > MAX_LISTED_OPTIONS
+    listed = [
+        (option["verb"], option.get("targetId"))
+        for option in model_input(observation, None, guidance)["options"]
+    ]
+    assert listed[:-1] == list(guidance.options[:MAX_LISTED_OPTIONS])
+    assert listed[-1] == ("wait", None)
+    assert all(target in guidance.goal_relevant for _, target in listed[:-1])
+    # Every goal-relevant target is listed at least once: no target's verbs crowd another out.
+    assert {target for _, target in listed[:-1]} == set(guidance.goal_relevant)
+    offered = {
+        (schema["properties"]["verb"]["const"],
+         schema["properties"].get("targetId", {}).get("const"))
+        for schema in option_schemas(guidance.options)
+    }
+    assert set(guidance.options) <= offered
+    first_other = next(
+        index for index, pair in enumerate(guidance.options)
+        if pair[1] not in guidance.goal_relevant
+    )
+    assert all(guidance.options.index(pair) < first_other for pair in goal_pairs
+               if pair[0] != "look_at")

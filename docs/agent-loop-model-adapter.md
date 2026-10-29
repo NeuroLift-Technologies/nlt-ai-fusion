@@ -30,11 +30,28 @@ until the stuck call returns or the process restarts. A request already waiting 
 was quarantined gets 503 if its own time runs out first, and then never starts inference; one still
 within its time when the stuck call returns goes ahead, since the model is free again. The timed-out
 decision is abandoned: its result is discarded and it is not remembered, since Godot never received
-an intent for it. Decisions
-on one model instance run one at a time. Perceptions and returned intents are validated, each avatar is limited to one
-in-flight decision, and synchronous inference runs outside the ASGI event loop. Invalid, stale, or
-unavailable decisions return a non-success response with no intent. ASFDK governance, live-world
-revalidation, and physical execution remain Godot responsibilities.
+an intent for it. Decisions on one model instance run one at a time. Perceptions and returned
+intents are validated, each avatar is limited to one in-flight decision, and synchronous inference
+runs outside the ASGI event loop. Invalid, stale, or unavailable decisions return a non-success
+response with no intent. ASFDK governance, live-world revalidation, and physical execution remain
+Godot responsibilities.
+
+### Quarantine: what an operator should do
+
+`GET /agent-loop/status` reports the quarantine to a supervisor on the same host (clients on
+127.0.0.1 or ::1 only; anyone else gets 403). It returns `quarantined`, `quarantined_since` (UTC, ISO 8601, or
+`null`), `running_timed_out_calls`, `timeout_s` and `model_kind`, and nothing about perceptions or
+agents. Entering quarantine logs one WARNING line; leaving it logs one INFO line.
+
+Policy:
+
+- A Python thread cannot be stopped, so a timed-out decision is abandoned, not cancelled. A
+  llama.cpp call that hangs never returns, and the quarantine then lasts until the process
+  restarts. While it lasts, every new decision gets 503 and Godot applies no new intent.
+- A supervisor should poll the status route and restart the endpoint once `quarantined` has been
+  true for longer than N seconds. Fusion does not restart itself. Choose N above the decision times
+  you see for the model: a call that is merely slow returns, and the quarantine lifts on its own.
+- A restart clears every agent's in-process memory, the same as an engine restart.
 
 ## Registered agents
 
@@ -73,10 +90,21 @@ changing it. Nothing in `context` is sent to the engine. The goal baseline (F4) 
 
 With a model configured, `src/fusion/agent_loop_ranking.py` (AGENT-LOOP-003 F3) also shapes the
 prompt and the output grammar for each decision. Visible entities are listed goal-relevant first,
-then nearest, each with its `distance` in metres and `goalRelevant`. Three kinds of pair are left
-out of what the model may output: the last pair when it changed nothing, `approach X` within the
-1 m arrival radius, and `look_at X` once X was looked at since entering the current scene (within
-the remembered history). `wait` is always allowed. Nothing here is sent to the engine. Measured effect and open decisions: brief §10.
+then nearest, each with its `distance` in metres and `goalRelevant`. Five rules leave a pair out of
+what the model may output:
+
+- the last pair when it changed nothing, except repeating `sit`, `use` or `rest` on a goal-relevant
+  target that is not a door or exit (`door_`, `exit_`) and is within 1.5 m of the agent
+  (`HOLD_RADIUS`): staying put there is the goal reached;
+- `approach X` within the 1 m arrival radius;
+- `look_at X` once X was looked at since entering the current scene (within the remembered history);
+- a target the avatar will be more than 30 m from when the intent executes, predicted from its
+  velocity and the expected decision time (the engine's reach check);
+- the `approach`, `sit`, `use` and `rest` pairs on a target the agent has twice stayed stuck short of
+  (blocked), for the rest of the scene; `look_at` on it stays allowed.
+
+Everything else is offered. `wait` is always allowed. Nothing here is sent to the engine. Measured
+effect and open decisions: brief §10-§12.
 
 The system prompt names no verb: naming them primed Qwen3-0.6B onto `look_at` in every case
 measured. With F3 guidance, the model's input carries no coordinates or velocity, only each
@@ -88,11 +116,20 @@ Goal relevance is matched against words in the engine's entity ids (`door_6_offi
 `sofa_1`; `NEED_KEYWORDS` in `src/fusion/agent_loop_ranking.py`). If the engine renames its id
 slugs, relevance silently falls back to distance order with no error, so keep the two in step.
 
-The input also lists `options`: the best 16 allowed decisions, best first (goal-relevant targets, then
-`approach` to targets not yet visited, then everything else, with `wait` last), and the output
-grammar offers every allowed pair in that order. Without a model, the endpoint uses the goal baseline
-(`src/fusion/agent_loop_baseline.py`, AGENT-LOOP-003 F4), which takes the first option. Results:
-brief §11.
+The input also lists `options`: the best 16 allowed decisions, best first, and the output grammar
+offers every allowed pair in that order:
+
+1. goal-relevant targets;
+2. `approach` to targets not yet visited, farthest first when nothing goal-relevant can be acted on
+   (exploring);
+3. everything else: the walk under way, then other approaches (least recently visited, then
+   farthest), then holding actions (`sit`, `use`, `rest`; `rest`, `sit`, `use` when the need is
+   rest or quiet), then `look_at`; within each group, a pair not yet chosen in this scene comes
+   first.
+
+`wait` is last. Actions on targets that do not serve the goal are demoted, never left out. Without a
+model, the endpoint uses the goal baseline (`src/fusion/agent_loop_baseline.py`, AGENT-LOOP-003 F4),
+which takes the first option. Results: brief §11-§12.
 
 ## Transformers/Safetensors path
 
