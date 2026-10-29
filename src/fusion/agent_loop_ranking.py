@@ -49,12 +49,13 @@ change that (F2 measured it), so the bias is removed structurally:
   would be out of reach at the position predicted from the avatar's velocity and the expected
   decision time are left out. A goal-relevant target that is out of reach does not stop the agent
   exploring.
-- **Blocked targets.** An approach, or a sit, use or rest, after which the agent is no closer to
-  and no farther from a target it is still short of means the target cannot be reached from here
-  (measured: the agent stopped 7.6 m short of a raised doorway, then chose `use` on it 9 times). Ending up farther away is not
-  counted: with a model taking seconds to decide, the wander after a `look_at` can carry the agent
-  off before the approach executes, and counting that left only the well at the spawn. Every pair on that target except `look_at` is left out
-  for the rest of the scene, within the remembered history.
+- **Blocked targets.** An approach, or a sit, use or rest, after which the agent is no closer
+  to and no farther from a target it is still short of, and that nobody else took, means the
+  target cannot be reached from here (measured: the agent stopped 7.6 m short of a raised
+  doorway, then chose `use` on it 9 times). Every pair on that target except `look_at` is left
+  out for the rest of the scene, within the remembered history. Ending up farther away is not
+  counted: with a model taking seconds to decide, the wander after a `look_at` can carry the
+  agent off before the approach executes, and counting that left only the well at the spawn.
 
 `wait` is never dropped, so a model always has something to choose. Exclusions are computed from
 the current perception and the F1 history only; history is cleared when the engine restarts, and
@@ -169,13 +170,6 @@ def last_visits(
     }
 
 
-def visited_targets(
-    observation: Mapping[str, Any], history: Sequence[DecisionRecord]
-) -> frozenset[str]:
-    """Targets the agent chose to go to, sit on, use or rest on since entering its current scene."""
-    return frozenset(last_visits(observation, history))
-
-
 def chosen_pairs(
     observation: Mapping[str, Any], history: Sequence[DecisionRecord]
 ) -> frozenset[tuple[str, str]]:
@@ -271,9 +265,11 @@ def _blocked(record: DecisionRecord) -> bool:
     closer to nor farther from it, short of it: beyond the arrival radius for `approach`, beyond
     the hold radius for `sit`, `use` and `rest`, which the agent may hold from a little farther.
     Farther means something else moved it, such as the wander after an earlier `look_at` while
-    this decision was still being made; that says nothing about the target."""
+    this decision was still being made; that says nothing about the target. Nor does a target
+    someone else took meanwhile: the engine refuses to sit on, use or rest on it while it is
+    held, and it may be free again later."""
     outcome = record.outcome
-    if record.verb not in _REACHING_VERBS:
+    if record.verb not in _REACHING_VERBS or outcome.target_taken:
         return False
     before, after = outcome.target_distance_before, outcome.target_distance_after
     if before is None or after is None:

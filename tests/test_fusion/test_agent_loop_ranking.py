@@ -609,6 +609,20 @@ def test_a_use_that_left_the_agent_short_of_the_target_blocks_it():
     observation = perception([entity("door_4_home", 7.6), entity("well", 12.0)])
     guidance = guide(observation, FOCUS, (use_record("door_4_home", before=7.61, after=7.61),))
     assert ("use", "door_4_home") in guidance.excluded
+    assert ("approach", "door_4_home") in guidance.excluded
+
+
+def test_a_seat_someone_else_took_meanwhile_is_not_blocked():
+    # The engine refuses to seat the agent on a chair another avatar holds; the distance stays.
+    observation = perception(
+        [entity("desk_chair_2", 4.0, affordances=("sit", "approach", "look_at"))], scene="office_1"
+    )
+    taken = replace(
+        approach_record("desk_chair_2", before=4.0, after=4.0, scene="office_1"), verb="sit"
+    )
+    taken = replace(taken, outcome=replace(taken.outcome, target_taken=True))
+    guidance = guide(observation, FOCUS, (taken,))
+    assert ("approach", "desk_chair_2") not in guidance.excluded
 
 
 def test_using_a_target_from_within_the_hold_radius_does_not_block_it():
