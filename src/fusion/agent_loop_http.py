@@ -52,9 +52,11 @@ from .agent_loop_registry import AgentRegistry, build_default_registry
 from .agent_loop_memory import DEFAULT_HISTORY_SIZE, StatefulAgentLoopDecision
 
 
-# Client addresses GET /agent-loop/status answers. The server binds 127.0.0.1; this also refuses a
-# status request that reached it through a proxy or a changed bind address.
-_LOOPBACK_HOSTS = frozenset({"127.0.0.1", "::1", "localhost"})
+# Client addresses GET /agent-loop/status answers. The server binds 127.0.0.1, so this matters only
+# if the bind address changes, or behind a local proxy that sets X-Forwarded-For (uvicorn then
+# reports the forwarded client). A local proxy that does not set it makes every client look local;
+# the payload holds nothing sensitive.
+_LOOPBACK_HOSTS = frozenset({"127.0.0.1", "::1"})
 
 # Values of FUSION_AGENT_LOOP_MODEL.
 MODEL_KINDS = ("baseline", "gguf", "transformers")
@@ -135,7 +137,7 @@ def create_app(
         """The quarantine state, for a supervisor on this host. No perception or agent data."""
         if request.client is None or request.client.host not in _LOOPBACK_HOSTS:
             return _error(403, "status is served on loopback only")
-        since = quarantine.since
+        since, running = quarantine.snapshot()
         body = {
             "quarantined": since is not None,
             "quarantined_since": (
@@ -143,7 +145,7 @@ def create_app(
                 if since is not None
                 else None
             ),
-            "running_timed_out_calls": quarantine.running,
+            "running_timed_out_calls": running,
             "timeout_s": timeout,
             "model_kind": model_kind,
         }

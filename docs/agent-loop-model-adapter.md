@@ -38,8 +38,8 @@ Godot responsibilities.
 
 ### Quarantine: what an operator should do
 
-`GET /agent-loop/status` reports the quarantine to a supervisor on the same host (loopback clients
-only; anyone else gets 403). It returns `quarantined`, `quarantined_since` (UTC, ISO 8601, or
+`GET /agent-loop/status` reports the quarantine to a supervisor on the same host (clients on
+127.0.0.1 or ::1 only; anyone else gets 403). It returns `quarantined`, `quarantined_since` (UTC, ISO 8601, or
 `null`), `running_timed_out_calls`, `timeout_s` and `model_kind`, and nothing about perceptions or
 agents. Entering quarantine logs one WARNING line; leaving it logs one INFO line.
 
@@ -47,7 +47,7 @@ Policy:
 
 - A Python thread cannot be stopped, so a timed-out decision is abandoned, not cancelled. A
   llama.cpp call that hangs never returns, and the quarantine then lasts until the process
-  restarts. While it lasts, Godot gets 503 on every decision and applies no new intent.
+  restarts. While it lasts, every new decision gets 503 and Godot applies no new intent.
 - A supervisor should poll the status route and restart the endpoint once `quarantined` has been
   true for longer than N seconds. Fusion does not restart itself. Choose N above the decision times
   you see for the model: a call that is merely slow returns, and the quarantine lifts on its own.

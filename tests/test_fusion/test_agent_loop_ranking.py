@@ -683,7 +683,8 @@ def test_a_seated_agent_that_drifts_just_past_the_arrival_radius_stays_seated():
 
 def office_view():
     """The office as the engine perceives it on entry (workplace_2, 20 entities, 61 allowed pairs
-    for a focus goal): measured 2026-10-29."""
+    for a focus goal), measured 2026-10-29: the same ids and affordances, positions simplified. If
+    the engine's office changes, update this to match."""
     seats = [f"desk_chair_{n}" for n in range(1, 7)] + [f"meeting_chair_{n}" for n in range(1, 5)]
     tables = ["meeting_table_1"] + [f"desk_{n}" for n in range(1, 7)] + ["whiteboard_1"]
     view = [entity("exit_workplace_2", 9.0)]
@@ -696,7 +697,7 @@ def office_view():
 
 
 def test_the_listed_options_are_the_best_ranked_so_no_goal_pair_gives_way_to_another():
-    from src.fusion.agent_loop_choices import MAX_LISTED_OPTIONS
+    from src.fusion.agent_loop_choices import MAX_LISTED_OPTIONS, option_schemas
 
     observation = perception(office_view(), scene="workplace_2")
     guidance = guide(observation, FOCUS, ())
@@ -712,6 +713,14 @@ def test_the_listed_options_are_the_best_ranked_so_no_goal_pair_gives_way_to_ano
     assert listed[:-1] == list(guidance.options[:MAX_LISTED_OPTIONS])
     assert listed[-1] == ("wait", None)
     assert all(target in guidance.goal_relevant for _, target in listed[:-1])
+    # Every goal-relevant target is listed at least once: no target's verbs crowd another out.
+    assert {target for _, target in listed[:-1]} == set(guidance.goal_relevant)
+    offered = {
+        (schema["properties"]["verb"]["const"],
+         schema["properties"].get("targetId", {}).get("const"))
+        for schema in option_schemas(guidance.options)
+    }
+    assert set(guidance.options) <= offered
     first_other = next(
         index for index, pair in enumerate(guidance.options)
         if pair[1] not in guidance.goal_relevant

@@ -142,6 +142,11 @@ class ModelQuarantine:
         with self._lock:
             return self._since
 
+    def snapshot(self) -> tuple[float | None, int]:
+        """(since, running), read together so the two always agree."""
+        with self._lock:
+            return self._since, self._running
+
     def enter(self) -> None:
         """A decision timed out and is still running."""
         with self._lock:
@@ -150,7 +155,7 @@ class ModelQuarantine:
                 self._since = time.time()
                 logger.warning(
                     "agent-loop model quarantined: a decision timed out and is still running; "
-                    "every request gets 503 until it returns or the process restarts"
+                    "every new decision gets 503 until it returns or the process restarts"
                 )
 
     def leave(self) -> None:
