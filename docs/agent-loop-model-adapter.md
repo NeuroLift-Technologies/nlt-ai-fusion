@@ -68,7 +68,13 @@ the remembered history). `wait` is always allowed. Nothing here is sent to the e
 
 The system prompt names no verb: naming them primed Qwen3-0.6B onto `look_at` in every case
 measured. With F3 guidance, the model's input carries no coordinates or velocity, only each
-entity's id, kind, distance, relevance, affordances and occupancy (brief §10.4).
+entity's id, kind, distance, relevance, affordances and occupancy (brief §10.4). It also leaves out
+`agentId` and `tick`, which the unguided input keeps: the model cannot use them, and the intent's
+correlation fields are filled in from the perception, not from the model.
+
+Goal relevance is matched against words in the engine's entity ids (`door_6_office`, `desk_1`,
+`sofa_1`; `NEED_KEYWORDS` in `src/fusion/agent_loop_ranking.py`). If the engine renames its id
+slugs, relevance silently falls back to distance order with no error, so keep the two in step.
 
 The input also lists `options`: the best 16 allowed decisions, best first (goal-relevant targets, then
 `approach` to targets not yet visited, then everything else, with `wait` last), and the output
