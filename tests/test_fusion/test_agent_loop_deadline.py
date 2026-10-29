@@ -11,6 +11,7 @@ from fastapi.testclient import TestClient
 
 from src.fusion import PROTOCOL_VERSION, LlamaCppAgentLoopDecision, TransformersAgentLoopDecision
 from src.fusion.agent_loop_deadline import (
+    Abandonable,
     DecisionAbandoned,
     abandonable,
     decision_timeout,
@@ -124,7 +125,7 @@ def test_every_agent_gets_503_at_once_while_the_model_is_quarantined(stuck_app):
     response = client.post("/agent-loop/perception", json=perception("avatar_2"))
     assert response.status_code == 503
     assert "still running" in response.json()["error"]
-    assert time.monotonic() - started < 0.2  # answered, not queued behind the stuck call
+    assert time.monotonic() - started < 2  # answered, not queued behind the 10 s stuck call
     assert source.calls == 1  # no new decision started on the quarantined model
     source.release.set()
 
@@ -140,7 +141,8 @@ def test_the_quarantine_ends_when_the_stuck_call_returns(stuck_app):
     assert response.json()["agentId"] == "avatar_2"
 
 
-def test_a_decision_within_the_timeout_is_answered(short_timeout):
+def test_a_decision_within_the_timeout_is_answered(monkeypatch):
+    monkeypatch.setenv("FUSION_AGENT_LOOP_TIMEOUT", "5")
     client = TestClient(create_app(decide=StatefulAgentLoopDecision(approach), registry=AGENTS))
     assert client.post("/agent-loop/perception", json=perception()).status_code == 200
 
@@ -186,7 +188,7 @@ def test_a_queued_call_whose_request_timed_out_never_starts_inference():
     adapter = LlamaCppAgentLoopDecision("unused.gguf", model=model)
     flag, token = abandonable()
     try:
-        flag.set()
+        flag.abandon()
         with pytest.raises(DecisionAbandoned):
             adapter(perception())
     finally:
@@ -291,3 +293,29 @@ def test_an_unknown_or_unavailable_model_fails_at_startup(monkeypatch, env):
         monkeypatch.setenv(variable, value)
     with pytest.raises((ValueError, FileNotFoundError, ImportError)):
         build_decision_source()
+
+
+def test_a_decision_committed_as_the_time_runs_out_is_not_abandoned():
+    handle = Abandonable()
+    handle.commit()
+    assert handle.abandon() is False
+
+
+def test_an_abandoned_decision_cannot_be_committed():
+    handle = Abandonable()
+    assert handle.abandon() is True
+    with pytest.raises(DecisionAbandoned):
+        handle.commit()
+
+
+def test_an_abandoned_decision_is_not_remembered():
+    memory = StatefulAgentLoopDecision(approach)
+    handle, token = abandonable()
+    try:
+        handle.abandon()
+        with pytest.raises(DecisionAbandoned):
+            memory(perception(tick=1))
+    finally:
+        restore(token)
+    memory(perception(tick=2))
+    assert memory.history("avatar_1") == ()

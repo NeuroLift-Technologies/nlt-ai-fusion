@@ -7,10 +7,11 @@ stopped, so the timed-out call is abandoned rather than cancelled: it runs to th
 nothing it produces is used.
 
 An abandoned decision never writes memory: Godot never received its intent, so there is no
-pending record to resolve. Code that would act on a decision checks `decision_abandoned()`
-first: the model adapters before starting inference, `StatefulAgentLoopDecision` before
-remembering the intent. The flag travels with the request's context into the worker thread
-(`asyncio.to_thread` copies context variables).
+pending record to resolve. The model adapters check `raise_if_abandoned()` before starting
+inference; `StatefulAgentLoopDecision` calls `commit_decision()` before remembering the intent.
+Committing and abandoning take the same lock, so exactly one wins: a decision committed just as
+the time ran out is answered with its intent instead of 503. The flag travels with the request's
+context into the worker thread (`asyncio.to_thread` copies context variables).
 """
 
 from __future__ import annotations
@@ -27,7 +28,37 @@ GODOT_TIMEOUT_SECONDS = 30.0
 # (Josh, 2026-10-28: start at 15 s).
 DEFAULT_TIMEOUT_SECONDS = 15.0
 
-_ABANDONED: ContextVar[threading.Event | None] = ContextVar("agent_loop_abandoned", default=None)
+
+class Abandonable:
+    """One decision's fate: committed by the worker, or abandoned by the request, never both."""
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._abandoned = False
+        self._committed = False
+
+    @property
+    def abandoned(self) -> bool:
+        with self._lock:
+            return self._abandoned
+
+    def abandon(self) -> bool:
+        """Give up on the decision. False if it was already committed: answer with its intent."""
+        with self._lock:
+            if self._committed:
+                return False
+            self._abandoned = True
+            return True
+
+    def commit(self) -> None:
+        """Claim the decision for the request. Raises if the request already gave up on it."""
+        with self._lock:
+            if self._abandoned:
+                raise DecisionAbandoned("the decision timed out before it was remembered")
+            self._committed = True
+
+
+_ABANDONED: ContextVar[Abandonable | None] = ContextVar("agent_loop_abandoned", default=None)
 
 
 class DecisionAbandoned(RuntimeError):
@@ -52,11 +83,11 @@ def decision_timeout() -> float:
     return seconds
 
 
-def abandonable() -> tuple[threading.Event, object]:
-    """Mark the current context's decision as abandonable. Returns the flag to set on timeout
-    and the token to pass to `restore`."""
-    flag = threading.Event()
-    return flag, _ABANDONED.set(flag)
+def abandonable() -> tuple[Abandonable, object]:
+    """Make the current context's decision abandonable. Returns its handle and the token to pass
+    to `restore`."""
+    handle = Abandonable()
+    return handle, _ABANDONED.set(handle)
 
 
 def restore(token: object) -> None:
@@ -64,16 +95,19 @@ def restore(token: object) -> None:
     _ABANDONED.reset(token)  # type: ignore[arg-type]
 
 
-def decision_abandoned() -> bool:
-    """True when the decision being made in this context has already timed out."""
-    flag = _ABANDONED.get()
-    return flag is not None and flag.is_set()
-
-
 def raise_if_abandoned() -> None:
     """Stop a decision whose request has already been answered."""
-    if decision_abandoned():
+    handle = _ABANDONED.get()
+    if handle is not None and handle.abandoned:
         raise DecisionAbandoned("the decision timed out before it started")
+
+
+def commit_decision() -> None:
+    """Claim the decision before remembering it; raises if the request already gave up on it.
+    Outside an abandonable request (tests, direct calls) it does nothing."""
+    handle = _ABANDONED.get()
+    if handle is not None:
+        handle.commit()
 
 
 class ModelQuarantine:

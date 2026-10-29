@@ -19,7 +19,8 @@ Boundaries (docs/contracts/agent-loop-v1.md):
     Godot's job; this server never claims execution.
   * Every decision is bounded by FUSION_AGENT_LOOP_TIMEOUT (default 15 s, always
     below Godot's 30 s). A decision that outlives it gets 503 and quarantines the
-    model: every agent gets 503 until the stuck call returns (agent_loop_deadline).
+    model: every new request gets 503 at once until the stuck call returns
+    (agent_loop_deadline).
 
 Run:
     python -m src.fusion.agent_loop_http      # deterministic goal baseline (F4)
@@ -143,13 +144,16 @@ def create_app(
                 task = asyncio.ensure_future(asyncio.to_thread(loop.handle_observation, body))
             finally:
                 restore(token)
-            done, _ = await asyncio.wait({task}, timeout=timeout)
-            if not done:
-                abandoned.set()
-                quarantine.enter()
-                task.add_done_callback(lambda finished: _released(finished, quarantine))
+            try:
+                done, _ = await asyncio.wait({task}, timeout=timeout)
+            except asyncio.CancelledError:
+                # The request went away (shutdown); the call keeps running all the same.
+                _abandon(task, abandoned, quarantine)
+                raise
+            if not done and _abandon(task, abandoned, quarantine):
                 return _error(503, f"decision exceeded {timeout:g} s; model quarantined")
-            intent = task.result()
+            # Done, or committed just as the time ran out: it finishes at once.
+            intent = await task
         except AgentLoopProtocolError:
             return _error(422, "decision did not satisfy the agent-loop contract")
         except Exception:  # noqa: BLE001 - transport boundary fails closed
@@ -166,6 +170,16 @@ def create_app(
         )
 
     return app
+
+
+def _abandon(task: asyncio.Future[Any], handle: Any, quarantine: ModelQuarantine) -> bool:
+    """Give up on a running decision and quarantine the model until it returns. False if the
+    decision was already committed, so its intent is about to arrive."""
+    if not handle.abandon():
+        return False
+    quarantine.enter()
+    task.add_done_callback(lambda finished: _released(finished, quarantine))
+    return True
 
 
 def _released(task: asyncio.Future[Any], quarantine: ModelQuarantine) -> None:
