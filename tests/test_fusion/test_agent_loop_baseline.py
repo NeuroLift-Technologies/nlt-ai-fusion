@@ -94,3 +94,16 @@ def test_waits_when_every_pair_is_excluded_or_occupied():
     taken["occupied"] = True
     intent = baseline()(perception([taken]))
     assert intent["verb"] == "wait"
+
+
+def test_with_no_goal_in_view_the_baseline_explores_instead_of_using_what_is_near():
+    decide = baseline()
+    intent = decide(perception([entity("plaza", 6.0), entity("well", 0.5)], tick=1))
+    assert (intent["verb"], intent["targetId"]) == ("approach", "plaza")
+
+
+def test_the_baseline_decides_instantly_so_the_reach_guard_does_not_hold_it_back():
+    observation = perception([entity("door_1_office", 24.0)])
+    observation["self"]["velocity"] = {"x": -1.4, "y": 0.0, "z": 0.0}
+    intent = baseline()(observation)
+    assert (intent["verb"], intent["targetId"]) == ("use", "door_1_office")
