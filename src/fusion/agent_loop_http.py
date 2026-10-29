@@ -17,10 +17,14 @@ Boundaries (docs/contracts/agent-loop-v1.md):
     other agentId gets 404 and no intent. Fusion never creates an avatar on demand.
   * ASFDK governance, live-world validation, and physical execution remain
     Godot's job; this server never claims execution.
+  * Every decision is bounded by FUSION_AGENT_LOOP_TIMEOUT (default 15 s, always
+    below Godot's 30 s). A decision that outlives it gets 503 and quarantines the
+    model: every agent gets 503 until the stuck call returns (agent_loop_deadline).
 
 Run:
     python -m src.fusion.agent_loop_http      # deterministic goal baseline (F4)
-    FUSION_GGUF_MODEL=/path/model.gguf python -m src.fusion.agent_loop_http
+    FUSION_AGENT_LOOP_MODEL=gguf FUSION_GGUF_MODEL=/path/model.gguf python -m src.fusion.agent_loop_http
+    FUSION_AGENT_LOOP_MODEL=transformers FUSION_TRANSFORMERS_MODEL=/path/model_dir python -m ...
 """
 
 from __future__ import annotations
@@ -38,33 +42,63 @@ from .agent_loop import (
     validate_perception,
 )
 from .agent_loop_baseline import goal_baseline
+from .agent_loop_deadline import ModelQuarantine, abandonable, decision_timeout, restore
 from .agent_loop_goals import with_goal
 from .agent_loop_registry import AgentRegistry, build_default_registry
 from .agent_loop_memory import DEFAULT_HISTORY_SIZE, StatefulAgentLoopDecision
 
 
+# Values of FUSION_AGENT_LOOP_MODEL.
+MODEL_KINDS = ("baseline", "gguf", "transformers")
+
+
+def selected_model() -> str:
+    """FUSION_AGENT_LOOP_MODEL: baseline, gguf or transformers. Unset, it is gguf when
+    FUSION_GGUF_MODEL is set (as before it existed), else baseline. Anything else fails."""
+    kind = os.environ.get("FUSION_AGENT_LOOP_MODEL", "").strip().lower()
+    if not kind:
+        return "gguf" if os.environ.get("FUSION_GGUF_MODEL", "").strip() else "baseline"
+    if kind not in MODEL_KINDS:
+        raise ValueError(
+            f"FUSION_AGENT_LOOP_MODEL must be one of {', '.join(MODEL_KINDS)}: {kind!r}"
+        )
+    return kind
+
+
 def build_decision_source(
     registry: AgentRegistry | None = None,
 ) -> Callable[[Mapping[str, Any]], Mapping[str, Any]]:
-    """GGUF model when FUSION_GGUF_MODEL is set, else the goal baseline, with per-agent memory.
+    """The decision source FUSION_AGENT_LOOP_MODEL selects, with per-agent memory.
 
-    The model is given the goal of the Avatar registered under each perception's agentId, its
-    recent decisions (AGENT-LOOP-003 F2) and the ranked options (F3). Without a model, the goal
-    baseline (F4) takes the first-ranked option for the same goal.
+    A model (`gguf` from FUSION_GGUF_MODEL, `transformers` from the FUSION_TRANSFORMERS_MODEL
+    directory) is given the goal of the Avatar registered under each perception's agentId, its
+    recent decisions (AGENT-LOOP-003 F2) and the ranked options (F3). The `baseline` (F4) takes
+    the first-ranked option for the same goal. A model that is selected but cannot be loaded
+    fails here, at startup, instead of on the first perception.
     FUSION_AGENT_LOOP_HISTORY sets how many past decisions each agent remembers.
     """
     raw_size = os.environ.get("FUSION_AGENT_LOOP_HISTORY", "").strip()
     history_size = int(raw_size) if raw_size else DEFAULT_HISTORY_SIZE
-    model_path = os.environ.get("FUSION_GGUF_MODEL", "").strip()
     agents = registry if registry is not None else build_default_registry()
-    if not model_path:
+    kind = selected_model()
+    if kind == "baseline":
         return StatefulAgentLoopDecision(goal_baseline(agents), history_size=history_size)
-    from .gguf_agent_decision import LlamaCppAgentLoopDecision
+    if kind == "gguf":
+        from .gguf_agent_decision import LlamaCppAgentLoopDecision
 
-    return StatefulAgentLoopDecision(
-        with_goal(LlamaCppAgentLoopDecision(model_path), agents),
-        history_size=history_size,
-    )
+        model: Any = LlamaCppAgentLoopDecision(_model_path("FUSION_GGUF_MODEL"))
+    else:
+        from .transformers_agent_decision import TransformersAgentLoopDecision
+
+        model = TransformersAgentLoopDecision(_model_path("FUSION_TRANSFORMERS_MODEL"))
+    return StatefulAgentLoopDecision(with_goal(model, agents), history_size=history_size)
+
+
+def _model_path(variable: str) -> str:
+    path = os.environ.get(variable, "").strip()
+    if not path:
+        raise ValueError(f"{variable} must be set for FUSION_AGENT_LOOP_MODEL={selected_model()}")
+    return path
 
 
 def create_app(
@@ -77,10 +111,12 @@ def create_app(
     `build_default_registry`.
     """
     agents = registry if registry is not None else build_default_registry()
+    timeout = decision_timeout()
     app = FastAPI(title="nlt.agent-loop.v1 fusion endpoint", version=PROTOCOL_VERSION)
     loop = FusionAgentLoop(decide if decide is not None else build_decision_source(agents))
 
     in_flight: set[str] = set()
+    quarantine = ModelQuarantine()
 
     @app.post("/agent-loop/perception")
     async def perception(request: Request) -> Response:
@@ -93,12 +129,27 @@ def create_app(
         # fail-closed (no intent applied, avatar keeps its current controller).
         if agent_id in in_flight:
             return _error(429, f"decision already in flight for {agent_id}")
+        # Never start a decision while one that timed out is still running.
+        if quarantine.active:
+            return _error(503, "model quarantined: a timed-out decision is still running")
 
         in_flight.add(agent_id)
         try:
             # Inference off the event loop: GGUF calls take seconds and must not
             # stall uvicorn (or, on the Godot side, its physics/render thread).
-            intent = await asyncio.to_thread(loop.handle_observation, body)
+            # The worker thread inherits this context, and with it the flag.
+            abandoned, token = abandonable()
+            try:
+                task = asyncio.ensure_future(asyncio.to_thread(loop.handle_observation, body))
+            finally:
+                restore(token)
+            done, _ = await asyncio.wait({task}, timeout=timeout)
+            if not done:
+                abandoned.set()
+                quarantine.enter()
+                task.add_done_callback(lambda finished: _released(finished, quarantine))
+                return _error(503, f"decision exceeded {timeout:g} s; model quarantined")
+            intent = task.result()
         except AgentLoopProtocolError:
             return _error(422, "decision did not satisfy the agent-loop contract")
         except Exception:  # noqa: BLE001 - transport boundary fails closed
@@ -115,6 +166,14 @@ def create_app(
         )
 
     return app
+
+
+def _released(task: asyncio.Future[Any], quarantine: ModelQuarantine) -> None:
+    """A timed-out decision has returned: end its part of the quarantine. Its result or error is
+    read so it is not reported as unhandled, and discarded."""
+    if not task.cancelled():
+        task.exception()
+    quarantine.leave()
 
 
 async def _read_perception(request: Request, agents: AgentRegistry) -> dict[str, Any] | Response:

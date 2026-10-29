@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import threading
 import uuid
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Mapping
@@ -14,6 +15,7 @@ from .agent_loop import (
     validate_perception,
 )
 from .agent_loop_choices import SYSTEM_PROMPT, grounded_choices, model_input, parse_decision
+from .agent_loop_deadline import raise_if_abandoned
 
 if TYPE_CHECKING:
     from .agent_loop_ranking import ChoiceGuidance
@@ -27,7 +29,8 @@ class TransformersAgentLoopDecision:
     """Generate contract-shaped intents from a local Hugging Face causal model.
 
     Model and tokenizer are loaded once at construction. The decision call itself is synchronous;
-    invoke it from a worker/service context rather than a real-time simulation tick.
+    invoke it from a worker/service context rather than a real-time simulation tick. Calls are
+    serialized: one model instance runs one generation at a time.
     """
 
     _SYSTEM_PROMPT = SYSTEM_PROMPT
@@ -51,6 +54,7 @@ class TransformersAgentLoopDecision:
         self.model_path = Path(model_path)
         self.device = device
         self.max_new_tokens = max_new_tokens
+        self._inference_lock = threading.Lock()
 
         if model is None:
             if not self.model_path.is_dir():
@@ -116,7 +120,10 @@ class TransformersAgentLoopDecision:
         if eos_token_id is not None:
             generation_options["pad_token_id"] = eos_token_id
 
-        generated = self._model.generate(input_ids, **generation_options)
+        with self._inference_lock:
+            # Queued behind a call that timed out: the request is answered, so do not start.
+            raise_if_abandoned()
+            generated = self._model.generate(input_ids, **generation_options)
         response = self._tokenizer.decode(
             generated[0][input_length:],
             skip_special_tokens=True,

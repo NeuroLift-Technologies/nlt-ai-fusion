@@ -71,8 +71,10 @@ The protocol and current status are documented in the
 and [versioned contract](https://github.com/NeuroLift-Technologies/nlt-world-engine/blob/main/docs/contracts/agent-loop-v1.md).
 Fusion's `src/fusion/agent_loop.py` provides the validating decision seam, exposed locally by
 `src/fusion/agent_loop_http.py` at `POST http://127.0.0.1:8001/agent-loop/perception`. Set
-`FUSION_GGUF_MODEL` to select the optional local GGUF model; without it the endpoint uses a
-deterministic model-free control decision. Inference runs outside the ASGI event loop, and malformed,
+`FUSION_AGENT_LOOP_MODEL` to `baseline`, `gguf` (with `FUSION_GGUF_MODEL`) or `transformers` (with
+`FUSION_TRANSFORMERS_MODEL`); with neither variable set the endpoint uses a deterministic model-free
+control decision. `FUSION_AGENT_LOOP_TIMEOUT` (default 15 s) bounds each decision; see
+[docs/agent-loop-model-adapter.md](docs/agent-loop-model-adapter.md). Inference runs outside the ASGI event loop, and malformed,
 stale, or unavailable decisions fail closed. The endpoint is loopback-only and does not perform
 ASFDK governance or physical execution. The existing `nlt.state-feed.v1` is a separate observer
 feed, not this control protocol.
