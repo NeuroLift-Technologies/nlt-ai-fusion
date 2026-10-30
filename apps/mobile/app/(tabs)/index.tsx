@@ -89,7 +89,7 @@ export default function DashboardScreen() {
       <View style={styles.card}>
         <Text style={[styles.cardTitle, { color: COLORS.primary }]}>Mission</Text>
         <Text style={styles.cardText}>
-          "Nothing About Us Without Us" — neurodivergent voices lead development.
+          &ldquo;Nothing About Us Without Us&rdquo; — neurodivergent voices lead development.
           NeuroLift trains AI Avatars with ADHD traits through authentic experiential
           learning in a Sims/RPG-style simulation.
         </Text>

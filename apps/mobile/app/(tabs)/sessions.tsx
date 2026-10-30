@@ -26,8 +26,9 @@ export default function SessionsScreen() {
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
 
+  // `loading` already starts true, so the mount fetch does not need to set it
+  // again synchronously inside the effect (react-hooks/set-state-in-effect).
   const load = () => {
-    setLoading(true);
     Promise.all([sessionsApi.list(), avatarsApi.list(), aidesApi.list()])
       .then(([s, a, ai]) => { setSessions(s); setAvatars(a); setAides(ai); })
       .finally(() => setLoading(false));

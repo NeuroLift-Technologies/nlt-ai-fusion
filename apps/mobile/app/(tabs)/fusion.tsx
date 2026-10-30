@@ -20,8 +20,9 @@ export default function FusionScreen() {
   const [loading, setLoading] = useState(true);
   const [attempting, setAttempting] = useState(false);
 
+  // `loading` already starts true, so the mount fetch does not need to set it
+  // again synchronously inside the effect (react-hooks/set-state-in-effect).
   const load = () => {
-    setLoading(true);
     Promise.all([fusionApi.list(), avatarsApi.list(), aidesApi.list()])
       .then(([r, a, ai]) => { setReports(r); setAvatars(a); setAides(ai); })
       .finally(() => setLoading(false));
