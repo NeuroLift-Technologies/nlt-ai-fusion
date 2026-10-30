@@ -1,0 +1,16 @@
+# Minimum Gradio ZeroGPU Space dependencies for nlt-ai-fusion
+#
+# ZeroGPU = CPU-only, no model inference, baseline decision source only
+# This is the smallest possible dependency set for the demo.
+
+# Core runtime
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0
+pydantic>=2.0.0
+typing-extensions>=4.0.0
+
+# Gradio for the UI
+gradio>=4.0.0
+
+# Python utilities
+python-dotenv>=1.0.0
