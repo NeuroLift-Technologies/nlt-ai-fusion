@@ -3,6 +3,11 @@ Tests for the world-state backend router.
 
 Uses FastAPI's TestClient to exercise every endpoint end-to-end
 against a freshly built WorldEngine.
+
+Archived with the legacy Python WorldEngine (see PR #152). The
+`/api/world` router was removed from `backend/app/main.py` and the
+router implementation now lives at
+`archive/legacy-world-engine/backend/app/routers/world.py`.
 """
 import json
 import os
