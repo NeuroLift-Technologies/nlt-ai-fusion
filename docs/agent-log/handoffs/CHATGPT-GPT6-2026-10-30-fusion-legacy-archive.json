@@ -1,0 +1,47 @@
+{
+  "handoff_record": {
+    "session_id": "chatgpt-gpt6-fusion-legacy-archive-20261030",
+    "agent_name": "ChatGPT GPT-6",
+    "date": "2026-10-30T11:39:48.559Z",
+    "repo": "NeuroLift-Technologies/nlt-ai-fusion",
+    "branch": "chore/fusion-archive-legacy-world-runtime-20261030",
+    "work_completed": [
+      "Prepared archival moves for the Python ECS/grid world, Cloudflare Durable Object simulation, old WebSocket/Three.js clients, browser prototype, legacy Python training scripts, old backend world router/schema, and simulation-only tests.",
+      "Retained the reusable cognitive scenario catalogue at src/simulation/scenario_catalog.py.",
+      "Prepared updates to README, architecture, quickstart, implementation status, Cloudflare notes, and agent instructions.",
+      "Removed the legacy /api/world router from backend/app/main.py."
+    ],
+    "work_in_progress": [
+      "Pull request review and CI verification"
+    ],
+    "blockers": [
+      "Tests were not executable in this session; CI must verify the resulting branch."
+    ],
+    "decisions_made": [
+      "Godot 4.7.2 in nlt-world-engine remains the sole physical simulation authority.",
+      "Historical source is preserved under archive/legacy-world-engine/.",
+      "Scenario definitions remain active cognitive/task data and are moved to src/simulation/scenario_catalog.py.",
+      "No external Cloudflare/Vercel resource was modified or decommissioned."
+    ],
+    "decisions_pending": [
+      "Whether any already-deployed Cloudflare Worker should be separately decommissioned; this source archive does not change deployed resources."
+    ],
+    "escalations": [],
+    "next_agent_notes": "Review the PR diff, run Python tests and application checks, search for remaining active imports of src.simulation.environment, cloudflare-engine, world3d, and prototypes/world-engine. Confirm active docs describe the opt-in local agent-loop and do not claim a complete embodied learning pipeline.",
+    "files_modified": [
+      "README.md",
+      "CLAUDE.md",
+      "QUICKSTART.md",
+      "docs/architecture.md",
+      "docs/implementation_summary.md",
+      "docs/cloudflare/CLOUDFLARE_SETUP.md",
+      "docs/active-threads.md",
+      "backend/app/main.py",
+      "src/simulation/__init__.py",
+      "src/simulation/scenario_catalog.py",
+      "tests/test_simulation/test_scenarios.py"
+    ],
+    "tests_run": [],
+    "tests_passing": false
+  }
+}

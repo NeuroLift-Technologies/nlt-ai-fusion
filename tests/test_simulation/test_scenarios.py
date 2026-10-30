@@ -8,7 +8,7 @@ from datetime import timedelta
 
 import pytest
 
-from src.simulation.environment.scenarios import (
+from src.simulation.scenario_catalog import (
     Scenario,
     ScenarioCategory,
     ScenarioLibrary,
