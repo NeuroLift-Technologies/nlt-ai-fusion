@@ -1,64 +1,9 @@
-"""
-Simulation Environment
+"""Cognitive training workflow exports.
 
-Creates realistic scenarios where Avatars experience authentic ADHD
-struggles while Aides provide real-time coaching.
+The authoritative physical simulation is implemented by the sibling
+nlt-world-engine Godot project. Legacy Python world-engine modules are archived
+under archive/legacy-world-engine and are not imported here.
 """
-
 from .session_orchestrator import SessionOrchestrator, SessionConfig, SessionResult
-from .environment import (
-    WorldEngine,
-    WorldEngineConfig,
-    SimulationState,
-    EventType,
-    TimeManager,
-    RelationshipManager,
-    RelationshipComponent,
-    FurnitureType,
-    FurnitureComponent,
-    RoomComponent,
-    NeedsComponent,
-    NeedType,
-    ScheduleComponent,
-    AgentInterface,
-    PerceptionMap,
-    Registry,
-    Entity,
-    Component,
-    Position,
-    Interactable,
-    AgentController,
-)
 
-# Placeholder for SimulationEnvironment - define it here for now
-class SimulationEnvironment(WorldEngine):
-    """Alias for WorldEngine to maintain API compatibility"""
-    pass
-
-__all__ = [
-    "SessionOrchestrator",
-    "SessionConfig",
-    "SessionResult",
-    "SimulationEnvironment",
-    "WorldEngine",
-    "WorldEngineConfig",
-    "SimulationState",
-    "EventType",
-    "TimeManager",
-    "RelationshipManager",
-    "RelationshipComponent",
-    "FurnitureType",
-    "FurnitureComponent",
-    "RoomComponent",
-    "NeedsComponent",
-    "NeedType",
-    "ScheduleComponent",
-    "AgentInterface",
-    "PerceptionMap",
-    "Registry",
-    "Entity",
-    "Component",
-    "Position",
-    "Interactable",
-    "AgentController",
-]
+__all__ = ["SessionOrchestrator", "SessionConfig", "SessionResult"]

@@ -1,7 +1,7 @@
 # Active Threads — neurolift-ai-fusion
 
 **Governance:** ORG-DEV-OTOI-1.0.3
-**Last updated:** 2026-10-29T05:30:00+00:00
+**Last updated:** 2026-10-30T00:00:00+00:00
 **Maintained by:** All active agents (update at session start and end)
 
 ---
@@ -18,7 +18,7 @@
 
 | Thread ID | Title | Owner | Agent | Branch | Status | Started |
 |-----------|-------|-------|-------|--------|--------|---------|
-| TH-008 | Document PR #43 Cloudflare workspace/config changes | Automation | Cursor Automation | cursor/documentation-automation-system-99aa | 🟡 In Progress | 2026-05-02 |
+| TH-008 | Document PR #43 Cloudflare workspace/config changes (superseded by TH-029 legacy World Engine retirement) | Automation | Cursor Automation | cursor/documentation-automation-system-99aa | ⚪ Superseded | 2026-05-02 |
 | TH-022 | Cross-repo governance alignment: upgrade OTOI v1.0.0→v1.0.3, add REVIEW.md, fix persona count (19→20), sync with nlt-world-engine + nlt-adhd | Joshua W. Dorsey, Sr. | Hermes Agent | hermes/th-022-governance-alignment-v2 | 🟡 In Progress | 2026-09-12T20:48:37-04:00 |
 | TH-023 | Add local model adapters and loopback HTTP endpoint for the Godot agent loop ([PR #119](https://github.com/NeuroLift-Technologies/neurolift-ai-fusion/pull/119)) | Joshua W. Dorsey, Sr. | Copilot CLI | feat/agent-loop-http-gguf-20261008 | 🟡 PR review pending | 2026-10-08 |
 | TH-024 | Link the web homepage (hero, new World Engine section, footer) to the NLT World Engine site at `neurolift-technologies.github.io/nlt-world-engine/` | Joshua W. Dorsey, Sr. | Claude Code | claude/serene-faraday-78ify3 | 🟡 In Progress | 2026-10-17 |
@@ -26,6 +26,7 @@
 | TH-026 | Fix the web build / Vercel preview deploy, red since #123 (workspace ERESOLVE from apps/mobile, Tailwind 4 major bump, postcss override conflict) | Joshua W. Dorsey, Sr. | Claude Code | claude/fix-web-build | 🟡 Fix on main via #126; this PR adds its records ([#127](https://github.com/NeuroLift-Technologies/neurolift-ai-fusion/pull/127)) | 2026-10-21T21:15:39+00:00 |
 | TH-027 | Make the README 20-pair roster canonical across neurolift-ai-fusion and nlt-fusion ([PR #130](https://github.com/NeuroLift-Technologies/neurolift-ai-fusion/pull/130), [nlt-world-engine#116](https://github.com/NeuroLift-Technologies/nlt-world-engine/pull/116)); pending Josh: review of the 18 proposed avatars/aides, Pages deploy on merge, DEPLOYMENT.md UE row, claude.ai Project text | Joshua W. Dorsey, Sr. | Claude Code | agent/claude-roster-canonicalization-20 | 🟡 In Review | 2026-10-22 |
 | TH-028 | AGENT-LOOP-003: give the agent-loop decision source state, goals and memory (`docs/specs/AGENT-LOOP-003-fusion-state-and-goals-brief.md`). F0-F4 merged (#132, #134, #135); exploring, reach guard, blocked targets (#136); acceptance tests (#137, Kilo); timeout + quarantine + model selection (#138); tier-3 ranking, demote-not-forbid (#139). Baseline passes 4a; no model met 4b (brief §12). Open: F5, model choice / decision time, the Qwen3-1.7B engine result | Joshua W. Dorsey, Sr. | Claude Code | ccr-100a7dbc-intpwq | 🟡 In Progress | 2026-10-29 |
+| TH-029 | Archive superseded Python, Cloudflare, and browser physical-world implementations; align Fusion docs and API with Godot-owned simulation | Joshua W. Dorsey, Sr. | ChatGPT GPT-6 | chore/archive-legacy-world-engine | 🟡 PR review pending | 2026-10-30 |
 
 
 ---

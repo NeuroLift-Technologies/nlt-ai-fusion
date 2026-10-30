@@ -1,0 +1,17 @@
+{
+  "agent_registration": {
+    "agent_name": "ChatGPT GPT-6",
+    "platform": "ChatGPT GitHub connector",
+    "version": "GPT-6",
+    "session_id": "chatgpt-gpt6-2026-10-30-legacy-world-archive",
+    "entry_date": "2026-10-30T00:00:00Z",
+    "entry_point": "Joshua requested archiving obsolete physical-world code in nlt-ai-fusion and updating README and related documentation, with GitHub and AI Software Architect context.",
+    "acknowledged_otoi": true,
+    "otoi_version": "ORG-DEV-OTOI-1.0.3",
+    "working_repo": "NeuroLift-Technologies/nlt-ai-fusion",
+    "working_branch": "chore/archive-legacy-world-engine",
+    "capabilities_self_reported": ["Repository inspection through GitHub", "Static architecture and dependency-boundary review", "Git tree and pull-request operations"],
+    "known_limitations": ["No local checkout or command execution in this session", "Builds, tests, and lockfile regeneration cannot be run through the GitHub connector"],
+    "preferred_handoff_format": "Structured JSON handoff plus pull-request summary"
+  }
+}

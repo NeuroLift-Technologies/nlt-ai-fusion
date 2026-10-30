@@ -10,12 +10,12 @@
 
 ## What This Repository Is
 
-`neurolift-ai-fusion` is the core AI training platform for NeuroLift Technologies. It implements the **Avatar-Aide-Advocate** system — an experiential learning framework designed to simulate ADHD traits and provide evidence-based coaching through AI agents.
+`nlt-ai-fusion` is the cognitive intelligence, learning, model-adapter, and application layer for NeuroLift Technologies' **Avatar–Aide–Advocate** system. It does not own the authoritative physical world. The sibling `nlt-world-engine` Godot 4.7.2 project owns world state, physics, movement, NPC execution, and physical consequences.
 
 The system enables:
 - **Avatars** — AI entities that simulate specific ADHD trait profiles (attention drift, task initiation difficulty, etc.)
 - **Aides** — AI coaching agents with domain expertise (attention science, task management, emotional regulation)
-- **Advocates** — Higher-level agents that coordinate Avatar-Aide pairs and escalate to human oversight
+- **Advocates** — Capabilities produced by fusing a trained Avatar–Aide pair; not a third independent source agent
 - **Training sessions** — Structured interactions that generate learning data and coaching outcomes
 
 ---
@@ -27,12 +27,12 @@ For the current layout, browse the repo or run `git ls-files | head -50`. The ke
 - `apps/api/` — FastAPI backend (Python 3.11+, wraps the simulation engine)
 - `apps/web/` — Next.js 14 web app (TypeScript + Tailwind)
 - `apps/mobile/` — Expo (React Native) iOS & Android
-- `src/` — Python simulation engine: `avatars/`, `aides/`, `core/`, `simulation/`, `fusion/`, `database/`
+- `src/` — Python cognitive and learning logic: `avatars/`, `aides/`, `core/`, `simulation/session_orchestrator.py`, `simulation/scenarios/`, `fusion/`, `database/`
 - `tests/` — pytest test suite
-- `docs/` — architecture, active threads, agent log, ai-guidance, cloudflare integration docs
+- `docs/` — current architecture, active threads, agent log, AI guidance, and integration contracts
 - `config/` — YAML + JSON configuration
 - `supabase/` — schema and migrations
-- `cloudflare/` — Workers infrastructure
+- `archive/legacy-world-engine/` — preserved, non-runtime Python/Cloudflare/browser world implementations
 - `.claude/` — Claude Code session governance (synced from `.github-private`; do not edit here)
 - `.nltotoi/` — governance namespace (validator, contracts, index)
 
@@ -42,7 +42,7 @@ For the current layout, browse the repo or run `git ls-files | head -50`. The ke
 
 | Layer | Technology |
 |-------|-----------|
-| Simulation Engine | Python 3.11+ |
+| Cognitive models and training workflows | Python 3.11+ |
 | API Backend | FastAPI + uvicorn (`apps/api/`) |
 | Web Frontend | Next.js 14 + TypeScript + Tailwind CSS (`apps/web/`) |
 | Mobile (iOS + Android) | Expo (React Native) + TypeScript (`apps/mobile/`) |
@@ -57,7 +57,7 @@ For the current layout, browse the repo or run `git ls-files | head -50`. The ke
 
 ## Commands
 
-### Python simulation engine + API
+### Python cognitive workflows + API
 
 ```bash
 # Run all tests (config: pytest.ini)
@@ -154,7 +154,7 @@ bash .nltotoi/scripts/validate-governance.sh --strict
 
 ## Quirks Worth Knowing
 
-- **`apps/` vs `src/` split.** `apps/api/` is a thin FastAPI wrapper; the real simulation engine is in `src/`. Don't reimplement engine logic inside `apps/api/` — import from `src/`.
+- **Physical-world boundary.** The authoritative simulator is the sibling `nlt-world-engine` Godot project. `src/` contains cognitive models, training orchestration, fusion logic, and adapters. Do not add a competing Python/Cloudflare/browser world runtime.
 - **Supabase availability is not guaranteed.** Every DB call path must work when Supabase is down. New code that assumes always-on Supabase will fail in CI's `pgsa-portability-gate.yml`. Consult `src/core/database/` for the established fallback pattern before adding new queries.
 - **RLS policy changes are escalation-required.** Schema migrations and RLS edits in `supabase/` trigger the escalation rule in OTOI §4.4. Don't push a schema change without an escalation record.
 - **Turborepo cache is real.** If `npx turbo run build` succeeds suspiciously fast on a fresh checkout, the cache is hot. To force a clean build: `npx turbo run build --force`.

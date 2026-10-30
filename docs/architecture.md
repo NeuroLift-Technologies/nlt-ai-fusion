@@ -1,485 +1,103 @@
-# NeuroLift Technologies Simulation Environment - Architecture Overview
+# AI-Fusion Architecture
 
-**Date:** Apr 25, 2026  
-**Version:** 1.2  
-**Author:** Cursor AI (Initial Implementation)
+**Status:** Current architecture baseline  
+**Date:** 2026-10-30  
+**Owner:** Joshua W. Dorsey, Sr.  
+**Prepared by:** ChatGPT (GPT-6)  
+**Governance:** ORG-DEV-OTOI-1.0.3
 
-**Document scope:** This document describes **this repo (`neurolift-ai-fusion`)** — the intelligence/task layer. The authoritative simulation world lives in the sibling repo.
+## 1. Repository responsibility
 
-## Relationship to `nlt-world-engine` and `nlt-adhd`
+`nlt-ai-fusion` is the cognitive intelligence, learning, and application layer of the NeuroLift embodied-AI platform. It does not own the authoritative physical simulation.
 
-```
-┌───────────────────────────────────────────┐   ┌─────────────────────────────────────────────┐   ┌─────────────────────────────────────────────┐
-│   nlt-world-engine (Godot target; UE ref.)   │   │   neurolift-ai-fusion  (THIS REPO)           │   │   nlt-adhd  (App delivery)                   │
-│   Physical simulation runtime               │   │   The intelligence + platform layer         │   │   Personalized 1:20 runtime                  │
-│                                             │   │                                             │   │                                              │
-│  • Godot 4.7.2 target runtime               │   │  • Avatar ADHD trait models (26-dim)        │   │  • 1 orchestrator + 20 advocates             │
-│  • UE 5.8 retained behavioral reference     │◄──┼─►  • Aide coaching strategies               │◄──┼─►  • User-facing surfaces (Talk/Start/Top3)  │
-│  • Rooms, objects, agents, physical state   │   │  • Session orchestration / training loop    │   │  • ASFDK governance boundary                 │
-│  • UE Mass/StateTree/RL (reference only)    │   │  • Fusion logic (Avatar + Aide → Advocate) │   │  • Local-first, no cloud dependency          │
-│                                             │   │  • Web / mobile / API / Cloudflare surfaces│   │                                              │
-│                                             │   │                                             │   │                                              │
-│       "World Engine owns physical reality"  │   │        "Fusion owns semantic reality"       │   │        "App owns user reality"               │
-└───────────────────────────────────────────┘   └─────────────────────────────────────────────┘   └─────────────────────────────────────────────┘
-```
+| Responsibility | Authoritative location |
+|---|---|
+| Physical world, spatial state, time, physics, movement, objects, NPC execution, scenario instantiation | `nlt-world-engine` (Godot 4.7.2) |
+| Avatar trait models and experiential behavior | `nlt-ai-fusion` |
+| Aide expertise, coaching, and intervention policy | `nlt-ai-fusion` |
+| Session orchestration, learning records, readiness assessment, and fusion logic | `nlt-ai-fusion` |
+| Advocate capability produced from a trained Avatar–Aide pair | `nlt-ai-fusion` |
+| Physical execution governance | Godot-side ASFDK-C# boundary in `nlt-world-engine` |
+| Human-facing representation of the Godot world | World Engine Reviewer in `nlt-world-engine` |
 
-**Pipeline:** World >> Fusion >> App
-- **World** builds the consequence-bearing environment where Avatars learn
-- **Fusion** trains the intelligence (20 advocates via Avatar-Aide pairs)
-- **App** delivers it — with Human Sovereignty preserved at runtime
+**Authority rule:** Godot owns physical reality. Fusion owns cognitive semantics and learning. The Reviewer represents and observes the Godot world; it is not another simulator or an intelligence layer. Fusion does not communicate with or control the Reviewer.
 
-The diagram's UE-specific systems are retained-reference context, not a claim that Unreal is the active target. Godot 4.7.2 is the target physical runtime; the live Fusion ↔ Godot transport and runtime dispatch are not yet wired.
+## 2. Avatar–Aide–Advocate model
 
-**Boundary:** This repo is the **brains**. `nlt-world-engine` is the **world**. `nlt-adhd` is the **user-facing delivery**. If it changes how an Avatar *thinks*, learns, or is coached → this repo. If it changes the *world* the Avatar lives in → `nlt-world-engine`. If it changes how the user *interacts* with their Advocate → `nlt-adhd`.
+The two source systems are the Avatar and Aide.
 
-## Physical-world runtime connection
+- **Avatar:** develops experiential understanding through embodied challenges, mistakes, consequences, and recovery.
+- **Aide:** contributes domain expertise, coaching, and intervention strategies. It supports Avatar development without replacing Avatar agency.
+- **Advocate:** the result of fusing the trained Avatar–Aide pair. It is not a third independent agent inserted between the two source systems.
 
-The `nlt.agent-loop.v1` contract, maintained at
-`nlt-world-engine/docs/contracts/agent-loop-v1.md`, defines the Godot ↔ Fusion control boundary:
-the world engine sends physical perception snapshots;
-Fusion returns semantic intents; the engine validates and executes their physical consequences.
-Fusion exposes this boundary over loopback HTTP via `src/fusion/agent_loop_http.py`, at
-`POST /agent-loop/perception`.
+The 20-pair roster is a canonical catalog, not evidence that all 20 pairs have been fully implemented, trained, or validated. Implementation and readiness claims must be backed by current pair-level evidence.
 
-Godot applies the sibling `asfdk-csharp` library at intent ingress before its independent physical
-validation and execution. Fusion's HTTP service does not perform governance or physical actions.
+## 3. Godot ↔ Fusion control boundary
 
-`src/fusion/agent_loop.py` is the validating Fusion seam for an injected semantic decision source.
-It is exposed by the HTTP endpoint but is not wired into `SessionOrchestrator`. The existing
-`src/simulation/environment/agent_interface.py` remains a separate environment implementation;
-it must not become a second source of physical truth for an integrated Godot runtime.
+The versioned contract is `nlt.agent-loop.v1`.
 
-## System Architecture
-
-The NeuroLift Technologies Simulation Environment implements a novel approach to AI training through experiential learning. Unlike traditional machine learning approaches that train on datasets, this system creates realistic simulation environments where AI agents (Avatars) experience authentic challenges and learn through doing.
-
-## Source-Verified Runtime Contracts (Apr 2026)
-
-The sections below provide conceptual architecture. For implementation-facing
-work, use this contract map first so docs and code stay aligned.
-
-### Canonical orchestration path
-
-| Contract | Source |
-| --- | --- |
-| Main runtime loop is `SessionOrchestrator.run_session(scenarios)` | `src/simulation/session_orchestrator.py` |
-| Stable interface verification tests | `tests/test_simulation/test_session_orchestrator.py` |
-| Scenario input keys expected by orchestrator loop | `name`, `task_type`, `base_success_rate`, `cognitive_demand` |
-| Session tuning knobs | `SessionConfig` (`max_attempts_per_scenario`, `max_coaching_per_attempt`, `min_attempts_for_success_check`, `success_rate_target`, `burnout_abort_threshold`, `check_fusion_readiness`) |
-
-### Public constructors and orchestration entrypoints
-
-```python
-# src/avatars/base_avatar.py
-BaseAvatar(avatar_id: str, trait_config: Dict[str, Any], event_bus: Optional[EventBus] = None)
-
-# src/aides/base_aide.py
-BaseAide(aide_id: str, expertise_config: Dict[str, Any], event_bus: Optional[EventBus] = None)
-
-# src/simulation/session_orchestrator.py
-SessionOrchestrator(
-    avatar: BaseAvatar,
-    aide: BaseAide,
-    config: Optional[SessionConfig] = None,
-    event_bus: Optional[EventBus] = None,
-)
-result = orchestrator.run_session(scenarios: List[Dict[str, Any]])
+```text
+Godot physical perception
+        ↓
+Fusion semantic decision
+        ↓
+Godot ASFDK governance and physical validation
+        ↓
+Godot execution and physical consequences
+        ↓
+Next perception
 ```
 
-### Avatar-Aide runtime workflow (current path)
+Godot sends agent-specific physical facts: self state, scene context, visible entities, and affordances. Fusion returns semantic intents such as `approach`, `look_at`, `use`, `sit`, `rest`, `communicate`, or `wait`.
 
-1. Create Avatar + Aide with shared or compatible `EventBus`.
-2. `SessionOrchestrator` binds the pair via `aide.bind_to_avatar(avatar)`.
-3. Avatar attempts tasks (`attempt_task`), Aide observes/coaches (`observe_and_coach`).
-4. Retry coaching calls `track_intervention_effectiveness(...)` for both successful
-   and failed retries, so strategy effectiveness captures losses as well as wins.
-5. Session tracks attempts/coaching/independence and (optionally) fusion readiness.
-6. Session completion emits `SESSION_COMPLETED` and serializes results through
-   `SessionResult.to_dict()`.
+Fusion does not return coordinates, velocity, teleportation commands, or direct world-state writes. Godot applies ASFDK-C# at intent ingress and independently validates physical preconditions before executing an action.
 
-### Fusion and Advocate contracts
+### Current integration status
 
-| Contract | Source |
-| --- | --- |
-| Fusion readiness scoring | `src/fusion/readiness_assessor.py` |
-| Fusion report/result construction | `src/fusion/fusion_engine.py` |
-| Fused Advocate public support API | `src/advocates/base_advocate.py` |
-| Current fusion package wiring test | `tests/test_fusion/test_exports.py` |
+- Fusion's decision seam is implemented in `src/fusion/agent_loop.py`.
+- The local HTTP adapter is `src/fusion/agent_loop_http.py`, exposing `POST /agent-loop/perception`.
+- Deterministic, GGUF, and Transformers decision sources are supported by configuration.
+- The opt-in local Godot 4.7.2 loop has been exercised in a headless/interactive test path.
+- The endpoint is loopback-only. A secure remote transport is not implied by the local integration and remains future work.
+- The agent loop is not yet the same workflow as `SessionOrchestrator`; embodied experience-to-learning updates and subsequent Advocate fusion still need an explicit, tested bridge.
 
-`ReadinessAssessor.assess(avatar, aide)` scores six dimensions:
-`EXPERIENTIAL_DEPTH`, `COACHING_EFFECTIVENESS`, `INDEPENDENCE_LEVEL`,
-`EMOTIONAL_RESILIENCE`, `STRATEGY_INTERNALISATION`, and `BURNOUT_MANAGEMENT`.
-The pair is ready only when every dimension passes its threshold and the overall
-score is at least `0.65`.
+The separate `nlt.state-feed.v1` observer protocol must remain distinct from the control loop. The Reviewer consumes the physical representation/state feed; it does not participate in Fusion decision-making.
 
-`FusionEngine.fuse(avatar, aide, force=False)` returns a `FusionReport`. On a
-successful fusion, the report contains a `FusionResult` with an `advocate_id`,
-`fusion_quality_score`, `AdvocateCapabilities`, validation results, and summaries
-extracted from Avatar experience memory and Aide effectiveness metrics. The
-engine does not instantiate a concrete Advocate subclass; callers pass the
-`FusionResult` into a `BaseAdvocate` subclass.
+## 4. Fusion internals
 
-`BaseAdvocate` subclasses must implement:
+| Module | Responsibility |
+|---|---|
+| `src/avatars/` | Avatar base behavior and trait-specific implementations |
+| `src/aides/` | Aide base behavior, expertise, coaching, and interventions |
+| `src/fusion/agent_loop.py` | Validates perception and produces semantic intent |
+| `src/fusion/agent_loop_http.py` | Local HTTP adapter for the agent-loop |
+| `src/fusion/readiness_assessor.py` | Assesses whether a pair meets fusion-readiness criteria |
+| `src/fusion/fusion_engine.py` | Constructs fusion results and Advocate capabilities |
+| `src/advocates/` | Advocate interfaces and resulting capabilities |
+| `src/simulation/session_orchestrator.py` | Cognitive training-session orchestration, not physical world simulation |
+| `src/simulation/scenarios/` | Scenario/task definitions for the cognitive training workflow |
+| `apps/api/`, `apps/web/`, `apps/mobile/` | Application surfaces |
 
-```python
-provide_empathic_support(user_context: Dict[str, Any]) -> Dict[str, Any]
-provide_expert_guidance(user_context: Dict[str, Any]) -> Dict[str, Any]
-```
+`SessionOrchestrator` and the Godot agent loop currently represent related but distinct execution paths. Do not claim the live embodied loop automatically persists learning or trains an Advocate unless that integration is implemented and tested.
 
-The primary user-facing method is
-`provide_comprehensive_support(user_context) -> SupportResponse`, which selects
-an `AdvocateMode`, combines empathic and expert payloads, caps actionable steps
-to five, and tracks interaction metrics. `activate_rrt_mode(user_context)`
-returns a crisis-mode `SupportResponse` only when
-`AdvocateCapabilities.crisis_intervention` is true; otherwise it returns
-`success=False`.
+## 5. Runtime and persistence boundaries
 
-### Constraints and known pitfalls
+- Godot owns transient authoritative world state and physical consequences.
+- Fusion owns cognitive decision-making, coaching, session-level learning records, readiness evaluation, and fusion artifacts.
+- Application persistence and external services remain explicit adapters; a Supabase migration or the presence of a schema does not prove that every runtime path uses it.
+- No credential, user-data, or remote-inference integration should be introduced without applicable OTOI approval and privacy controls.
 
-- `src/simulation/training_session.py` uses an older `CoachingContext` shape
-  and is currently not the canonical orchestration path.
-- `scripts/test_training_loop.py` routes through `TrainingSession`, so it is
-  useful as a reproducible diagnostic, not as a stable "green path."
-- The stable verification target for orchestration behavior is:
-  `tests/test_simulation/test_session_orchestrator.py`.
-- Fusion currently has export-level test coverage only in
-  `tests/test_fusion/test_exports.py`; behavior above is source-verified but not
-  protected by dedicated fusion/Advocate behavior tests in this snapshot.
-- RRT is represented in Aide/Advocate capability fields and crisis-mode helper
-  methods, but there is no implemented `rrt_foundation` module exported from
-  `src/aides/__init__.py`.
-- Supabase is optional at runtime. `SupabaseClient` only initializes a live client
-  when both `VITE_SUPABASE_URL` and `VITE_SUPABASE_SUPABASE_ANON_KEY` are present
-  and the `supabase` package is installed; otherwise DB methods return `None`/`[]`
-  and simulation components continue in local mode.
+## 6. Retired implementations
 
-### High-Level Architecture
+Superseded physical-world implementations are preserved under [`archive/legacy-world-engine/`](../archive/legacy-world-engine/README.md), including the Python ECS/grid world, Cloudflare Durable Object ECS/grid runtime, browser-only World Engine prototype, old `/world` Sims viewer, Python WebSocket client, legacy `/api/world` backend router, and documentation specific to those runtimes.
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    NeuroLift Technologies Simulation Environment           │
-├─────────────────────────────────────────────────────────────┤
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐        │
-│  │   Avatars   │  │    Aides    │  │  Advocates  │        │
-│  │             │  │             │  │             │        │
-│  │ • ADHD      │  │ • RRT Core  │  │ • Fusion    │        │
-│  │   Traits    │  │ • PhD       │  │   Engine    │        │
-│  │ • Struggle  │  │   Expertise │  │ • Combined  │        │
-│  │   Simulation│  │ • Real      │  │   Experience│        │
-│  │             │  │   Feedback  │  │   +         │        │
-│  └─────────────┘  └─────────────┘  │   Expertise │        │
-│           │               │        └─────────────┘        │
-│           └───────┬───────┘                               │
-│                   │                                       │
-│  ┌─────────────────────────────────────────────────────────┤
-│  │              Simulation Environment                    │
-│  │                                                       │
-│  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐   │
-│  │  │   Scenarios │  │     NPCs    │  │  Challenges │   │
-│  │  │             │  │             │  │             │   │
-│  │  │ • Workplace │  │ • Neurotyp. │  │ • Random    │   │
-│  │  │ • Personal  │  │ • Biased    │  │   Dysfunc.  │   │
-│  │  │ • Social    │  │ • Supportive│  │ • Burnout   │   │
-│  │  └─────────────┘  └─────────────┘  │   Sim.      │   │
-│  │                                   └─────────────┘   │
-│  │                                                       │
-│  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐   │
-│  │  │ World Engine│  │ Time System │  │ Consequence │   │
-│  │  │             │  │             │  │   System    │   │
-│  │  │ • Physics   │  │ • Scheduling│  │ • Real      │   │
-│  │  │ • Events    │  │ • Passage   │  │   Results   │   │
-│  │  └─────────────┘  └─────────────┘  └─────────────┘   │
-│  └─────────────────────────────────────────────────────────┤
-│                                                           │
-│  ┌─────────────────────────────────────────────────────────┤
-│  │              Training & Metrics                        │
-│  │                                                       │
-│  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐   │
-│  │  │ Session     │  │ Progress    │  │ Fusion      │   │
-│  │  │ Manager     │  │ Tracker     │  │ Readiness   │   │
-│  │  │             │  │             │  │             │   │
-│  │  │ • Training  │  │ • Independence│  │ • Criteria  │   │
-│  │  │   Loop      │  │ • Milestones │  │ • Assessment│   │
-│  │  └─────────────┘  └─────────────┘  └─────────────┘   │
-│  └─────────────────────────────────────────────────────────┤
-└─────────────────────────────────────────────────────────────┘
-```
+These files are historical reference only. They are not import paths, supported APIs, deployable runtimes, or sources of physical truth.
 
-## Core Components
+## 7. Architectural invariants
 
-### 1. Avatar System
-
-**Purpose:** Simulate authentic ADHD experiences and struggles
-
-**Key Characteristics:**
-- Embodies specific ADHD traits (attention deficit, impulsivity, working memory issues, etc.)
-- Experiences realistic stress, frustration, and failure patterns
-- Makes decisions with real consequences in simulated environments
-- Learns through repeated attempts and gradual improvement
-
-**Architecture:**
-```python
-class BaseAvatar:
-    """Base class for all ADHD trait Avatars"""
-    
-    def __init__(self, trait_config: Dict[str, Any]):
-        self.trait_config = trait_config
-        self.current_state = AvatarState()
-        self.struggle_patterns = []
-        self.learning_progress = {}
-    
-    def attempt_task(self, scenario: Scenario) -> TaskResult:
-        """Attempt a task with ADHD trait affecting performance"""
-        pass
-    
-    def experience_consequence(self, result: TaskResult) -> None:
-        """Process the result and update internal state"""
-        pass
-    
-    def get_independence_level(self) -> float:
-        """Return current independence level (0.0 to 1.0)"""
-        pass
-```
-
-### 2. Aide System
-
-**Purpose:** Provide expert coaching and support during Avatar struggles
-
-**Foundation Components:**
-1. **RRT Core:** Rapid Response Team foundation with burnout detection
-2. **PhD Expertise:** Deep academic knowledge of specific executive functions
-3. **Real-World Feedback:** Community wisdom from successful ADHD individuals
-
-**Architecture:**
-```python
-class BaseAide:
-    """Base class for all coaching Aides"""
-    
-    def __init__(self, expertise_config: Dict[str, Any]):
-        self.rrt_core = RRTFoundation()
-        self.phd_expertise = ExecutiveFunctionExpertise()
-        self.real_world_feedback = CommunityWisdom()
-        self.coaching_strategies = []
-    
-    def observe_avatar_struggle(self, avatar: BaseAvatar, scenario: Scenario) -> None:
-        """Monitor Avatar's current challenges"""
-        pass
-    
-    def provide_coaching(self, avatar: BaseAvatar, context: CoachingContext) -> CoachingAction:
-        """Provide real-time coaching intervention"""
-        pass
-    
-    def assess_burnout_risk(self, avatar: BaseAvatar) -> BurnoutRisk:
-        """Evaluate if Avatar is approaching burnout"""
-        pass
-```
-
-### 3. Simulation Environment
-
-**Purpose:** Create realistic scenarios with meaningful consequences
-
-**Key Features:**
-- **World Engine:** Manages simulation state, physics, and events
-- **Time System:** Handles scheduling, deadlines, and time passage
-- **Consequence System:** Ensures actions have realistic results
-- **NPCs:** Create social dynamics and comparison scenarios
-- **Random Challenges:** Inject unexpected difficulties to test resilience
-
-**Architecture:**
-```python
-class SimulationEnvironment:
-    """Core simulation environment"""
-    
-    def __init__(self, config: EnvironmentConfig):
-        self.world_engine = WorldEngine()
-        self.time_system = TimeSystem()
-        self.consequence_system = ConsequenceSystem()
-        self.npc_manager = NPCManager()
-        self.challenge_injector = ChallengeInjector()
-    
-    def run_scenario(self, scenario: Scenario, avatar: BaseAvatar, aide: BaseAide) -> ScenarioResult:
-        """Execute a complete scenario with Avatar-Aide interaction"""
-        pass
-    
-    def inject_random_challenge(self, avatar: BaseAvatar) -> Challenge:
-        """Randomly introduce new executive function challenges"""
-        pass
-```
-
-### 4. Advocate Fusion System
-
-**Purpose:** Combine trained Avatar experience with Aide expertise
-
-**Fusion Criteria:**
-- Avatar demonstrates consistent independence across scenarios
-- Aide has proven effective coaching strategies
-- Both systems have sufficient training data
-- Fusion readiness assessment passes
-
-**Architecture:**
-```python
-class FusionEngine:
-    """Manages Avatar-Aide fusion into Advocates"""
-    
-    def assess_fusion_readiness(self, avatar: BaseAvatar, aide: BaseAide) -> FusionReadiness:
-        """Evaluate if Avatar-Aide pair is ready for fusion"""
-        pass
-    
-    def fuse_into_advocate(self, avatar: BaseAvatar, aide: BaseAide) -> BaseAdvocate:
-        """Combine Avatar and Aide into fused Advocate"""
-        pass
-    
-    def validate_advocate(self, advocate: BaseAdvocate) -> ValidationResult:
-        """Test fused Advocate's capabilities"""
-        pass
-```
-
-## Data Flow Architecture
-
-### Training Loop Flow
-
-```
-1. Scenario Selection
-   ↓
-2. Avatar Attempts Task
-   ↓
-3. ADHD Trait Affects Performance
-   ↓
-4. Aide Observes Struggle
-   ↓
-5. Aide Provides Coaching
-   ↓
-6. Avatar Tries Again (with support)
-   ↓
-7. Consequence System Evaluates Result
-   ↓
-8. Progress Tracking Updates
-   ↓
-9. Independence Assessment
-   ↓
-10. [Repeat until mastery OR fusion readiness]
-```
-
-### Fusion Process Flow
-
-```
-1. Avatar Independence Check
-   ↓
-2. Aide Effectiveness Assessment
-   ↓
-3. Fusion Readiness Evaluation
-   ↓
-4. Experience + Expertise Combination
-   ↓
-5. Advocate Validation Testing
-   ↓
-6. RRT Burnout Response Integration
-   ↓
-7. Final Advocate Deployment
-```
-
-## Design Patterns
-
-### 1. Component-Based Architecture
-- Each Avatar trait is a separate component
-- Aide expertise modules are independent components
-- Scenarios are modular and composable
-- Easy to add new traits, strategies, or scenarios
-
-### 2. Observer Pattern
-- Progress tracking observes Avatar-Aide interactions
-- Metrics system monitors training progress
-- Fusion readiness assessment watches independence levels
-
-### 3. Strategy Pattern
-- Different coaching strategies for different situations
-- Multiple intervention approaches per executive function
-- Adaptive strategy selection based on context
-
-### 4. Factory Pattern
-- Scenario generation from templates
-- Avatar-Aide pair creation
-- NPC behavior instantiation
-
-### 5. State Machine Pattern
-- Avatar state transitions (struggling → learning → independent)
-- Aide coaching state management
-- Simulation environment state tracking
-
-## Privacy and Security Architecture
-
-### Local Processing Design
-- All simulation runs locally
-- No external data transmission
-- User data stored locally only
-- No cloud dependencies
-
-### Data Privacy Principles
-- Minimal data collection
-- Explicit consent for any data sharing
-- Transparent data handling
-- No monetization of user data
-
-### Security Considerations
-- Input validation for all user data
-- Secure configuration management
-- Local storage encryption
-- No external API dependencies
-
-## Performance Considerations
-
-### Simulation Performance
-- Efficient state management for long training sessions
-- Parallel execution of multiple Avatar-Aide pairs
-- Optimized event processing
-- Memory management for extended runs
-
-### Scalability Design
-- Support for running all 20 Avatar-Aide pairs simultaneously
-- Efficient resource allocation
-- Horizontal scaling capabilities
-- Performance monitoring and optimization
-
-## Testing Architecture
-
-### Unit Testing
-- Individual component testing
-- Avatar trait behavior validation
-- Aide coaching strategy testing
-- Scenario execution testing
-
-### Integration Testing
-- Avatar-Aide interaction testing
-- End-to-end scenario testing
-- Fusion process validation
-- Performance benchmarking
-
-### Validation Testing
-- Real-world scenario accuracy
-- ADHD trait authenticity
-- Coaching effectiveness
-- Advocate capability validation
-
-## Future Extensibility
-
-### Adding New Traits
-- New Avatar trait components
-- Corresponding Aide expertise modules
-- Relevant scenario additions
-- Updated fusion criteria
-
-### New Scenario Types
-- Additional workplace scenarios
-- Personal life situation expansion
-- Social dynamic variations
-- Educational environment scenarios
-
-### Enhanced AI Capabilities
-- More sophisticated NPC behaviors
-- Advanced coaching strategies
-- Improved fusion algorithms
-- Better burnout detection
-
----
-
-**This architecture supports the core innovation of experiential AI learning while maintaining flexibility for future enhancements and community contributions.**
+1. **Capability ≠ authority.** Fusion may propose semantic intent; Godot owns physical execution.
+2. **One physical source of truth.** No Python or Cloudflare world runtime competes with Godot.
+3. **Reviewer is a projection.** It represents Godot state and does not own simulation or intelligence.
+4. **Two source systems, one fusion result.** Advocate emerges from the trained Avatar–Aide pair.
+5. **Escalate, do not guess.** Material changes to authority boundaries, transport, persistence, or model-provider commitments require human approval.
+6. **Evidence before claims.** Distinguish catalogued, prototyped, implemented, trained, and validated capabilities.

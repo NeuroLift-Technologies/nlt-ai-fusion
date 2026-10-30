@@ -2,9 +2,9 @@
 
 **Full-Stack Avatar-Aide-Advocate Training Platform**
 
-A full-stack web and mobile platform backed by a Python AI simulation engine. AI Avatars with ADHD traits experience authentic life struggles in a Sims/RPG-style environment while AI Aides provide real-time coaching. After sufficient training they fuse into Advocates that combine lived understanding with expert solutions.
+A full-stack Avatar–Aide–Advocate cognitive intelligence and research platform. Python implements Avatar trait models, Aide expertise, session orchestration, model adapters, and fusion. The physical environment is owned by the sibling Godot World Engine.
 
-> **Sibling repo:** [`nlt-world-engine`](https://github.com/NeuroLift-Technologies/nlt-world-engine) owns the **physical simulation layer**. Godot 4.7.2 is the target runtime; `WorldEngine/` is the retained UE reference implementation. This repo owns the **intelligence**—ADHD trait models, Aide coaching, session orchestration, and fusion. The closed-loop agent contract is defined, but the live Fusion ↔ Godot runtime connection is not yet wired.
+> **Sibling repo:** [`nlt-world-engine`](https://github.com/NeuroLift-Technologies/nlt-world-engine) owns the **physical simulation layer**. Godot 4.7.2 is the active runtime; `WorldEngine/` is the frozen UE 5.8 behavioral reference. This repo owns **cognition and learning**: Avatar trait models, Aide expertise, training workflows, model adapters, and Avatar–Aide fusion. The opt-in local Godot ↔ Fusion agent loop is operational; a secure remote transport is not yet established.
 
 ```yaml
 ai_assistant_directive:
@@ -43,13 +43,13 @@ npx expo start
 # → scan QR with Expo Go on your device
 ```
 
-### Simulation Engine (Python — Intelligence Layer)
+### Python cognitive layer and tests
 ```bash
 pip install -r requirements.txt
 pytest
 ```
 
-> **Note:** The physical simulation runtime is in [`nlt-world-engine/world-engine-godot`](https://github.com/NeuroLift-Technologies/nlt-world-engine/tree/main/world-engine-godot), not this repo. This repo provides the Python intelligence (Avatar trait models, Aide coaching, session orchestration). The legacy lightweight Python world in `src/simulation/environment/` is for testing and reference only; it is not a second physical source of truth for a Godot integration.
+> **Boundary:** The physical simulation runtime is in [`nlt-world-engine/world-engine-godot`](https://github.com/NeuroLift-Technologies/nlt-world-engine/tree/main/world-engine-godot). This repository does not own world physics, spatial state, movement, NPC execution, or world persistence. Superseded Python, Cloudflare ECS, and browser-world implementations have been preserved under [`archive/legacy-world-engine/`](archive/legacy-world-engine/README.md) and are not active runtime dependencies.
 
 ### Physical-world agent loop
 
@@ -75,9 +75,9 @@ Fusion's `src/fusion/agent_loop.py` provides the validating decision seam, expos
 `FUSION_TRANSFORMERS_MODEL`); with neither variable set the endpoint uses a deterministic model-free
 control decision. `FUSION_AGENT_LOOP_TIMEOUT` (default 15 s) bounds each decision; see
 [docs/agent-loop-model-adapter.md](docs/agent-loop-model-adapter.md). Inference runs outside the ASGI event loop, and malformed,
-stale, or unavailable decisions fail closed. The endpoint is loopback-only and does not perform
-ASFDK governance or physical execution. The existing `nlt.state-feed.v1` is a separate observer
-feed, not this control protocol.
+stale, or unavailable decisions fail closed. The endpoint is currently loopback-only and does not perform
+ASFDK governance or physical execution. Remote deployment requires a separately designed,
+authenticated transport. The `nlt.state-feed.v1` observer feed is a separate protocol, not this control path.
 
 #### Agent-loop status (AGENT-LOOP-003, 2026-10-29)
 
@@ -106,17 +106,15 @@ The repository currently has multiple JavaScript package-manager surfaces:
 | --- | --- | --- |
 | `apps/web/` | `pnpm-lock.yaml` | Next.js web surface and `/simulation-lab` |
 | `apps/mobile/` | `package-lock.json` | Expo mobile starter |
-| `cloudflare-engine/` | `package-lock.json` | World Engine Worker and local Wrangler CLI |
 
 Use the lockfile in the package you are changing. For web-only dependency work,
 run pnpm inside `apps/web/` so the checked-in `pnpm-lock.yaml` stays in sync and
-avoid creating an `apps/web/package-lock.json`. For the Cloudflare worker, run
-`npm ci` from `cloudflare-engine/` so local `npx wrangler ...` commands use the
-repo-pinned Wrangler v4 dependency instead of a global install.
+avoid creating an `apps/web/package-lock.json`. Mobile dependencies remain managed
+by the lockfile in `apps/mobile/`. The legacy Worker toolchain is retained only in
+the archive and is not an active runtime.
 
 ---
 
-[![Deploy to Cloudflare Workers](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/NeuroLift-Technologies/neurolift-ai-fusion)
 [![Visit Site](https://img.shields.io/badge/Visit%20Site-neuroliftsolutions.com-F38020?style=for-the-badge&logo=cloudflare&logoColor=white)](https://neuroliftsolutions.com)
 
 ## 🎯 Project Vision
@@ -234,20 +232,12 @@ UE-side plugin/tooling details: see the **UE Plugins Enabled** table and subsyst
 
 Full CI/CD documentation: [`docs/CI_HARNESS_README.md`](docs/CI_HARNESS_README.md)
 
-### 🌐 Cloudflare Integration
+### 🌐 Cloudflare and edge infrastructure
 
-Our infrastructure leverages Cloudflare for:
-- **WordPress Hosting**: Optimized performance and caching
-- **Cloudflare Workers**: Serverless edge computing
-- **Cloudflare Pages**: Static site hosting for documentation and app interfaces
-- **CDN**: Global content delivery for fast access
-- **Security**: DDoS protection, WAF, and bot mitigation
-
-| Worker | Purpose |
-|--------|---------|
-| **`neurolift-world-engine`** | Separate Cloudflare ECS prototype (`cloudflare-engine/src/index.ts`) with a WebSocket `/connect` gateway; it is not the Godot 4.7.2 runtime or the `nlt.agent-loop.v1` Fusion ↔ Godot connection |
-
-Deployment details: [`docs/cloudflare/CLOUDFLARE_SETUP.md`](docs/cloudflare/CLOUDFLARE_SETUP.md)
+Cloudflare remains part of the wider NeuroLift infrastructure for DNS, CDN, security,
+and applicable web or documentation hosting. The legacy Cloudflare Durable Object World
+Engine and its WebSocket/grid-simulation implementation have been archived. They are not
+an active simulation runtime, observer feed, or transport for `nlt.agent-loop.v1`.
 
 ## 🛡️ Privacy-First Design
 
@@ -293,7 +283,7 @@ Formal `CONTRIBUTING.md` guidance is being drafted; for now, follow the CI workf
 - [Quick Start Guide](QUICKSTART.md)
 - [TOI-OTOI Integration](TOI-OTOI-INTEGRATION.md)
 - [Implementation Summary](docs/implementation_summary.md)
-- [Cloudflare Setup Guide](docs/cloudflare/CLOUDFLARE_SETUP.md)
+- [Legacy World Engine archive](archive/legacy-world-engine/README.md)
 
 ## 📞 Contact
 
@@ -306,12 +296,12 @@ Formal `CONTRIBUTING.md` guidance is being drafted; for now, follow the CI workf
 
 ## 📄 License
 
-[License TBD - Open Source]
+[Apache License 2.0](LICENSE)
 
 ## 🎯 Current Status
 
-**Development Phase:** Fusion & AI Model Layer (Phases 5–6); Godot 4.7.2 migration and the Fusion ↔ Godot runtime connection remain in progress.
-**Last Updated:** September 2026  
+**Development Phase:** Fusion & AI Model Layer. The Godot 4.7.2 physical runtime is maintained in `nlt-world-engine`; the opt-in local agent loop is operational, while remote transport and the full embodied learning-to-Advocate pipeline remain in development.
+**Last Updated:** October 30, 2026  
 **Next Milestone:** Expand remaining 16 Avatar-Aide pairs → real-world testing with neurodivergent community  
 **Spec:** [`docs/specs/advocate-model-fusion-spec.md`](docs/specs/advocate-model-fusion-spec.md) + [`docs/research/Trajectory Distillation for Behavioral AI Fusion.md`](docs/research/Trajectory%20Distillation%20for%20Behavioral%20AI%20Fusion.md)
 

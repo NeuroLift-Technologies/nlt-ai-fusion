@@ -77,7 +77,6 @@ Source-verified constraints:
   `ignore_missing_imports = True` and suppresses only the currently excluded
   modules:
   - `src.database.supabase_client`
-  - `src.simulation.network_client`
   - `src.simulation.training_session`
   - `src.aides.coaching.stay_alert_aide`
 - The `stay_alert_aide` exclusion is tied to the pre-existing
@@ -89,7 +88,6 @@ PR #58 raised clearance coverage with targeted tests for these public surfaces:
 | Test file | Source covered | Behavior protected |
 | --- | --- | --- |
 | `tests/test_aides/test_attention_expert.py` | `src/aides/expertise/attention_expert.py` | strategy selection, capacity assessment, recovery actions, and attention plan shape |
-| `tests/test_simulation/test_base_npc.py` | `src/simulation/npcs/base_npc.py` | NPC reaction serialization, disposition transitions, patience/relationship bounds, and summaries |
 | `tests/test_simulation/test_base_scenario.py` | `src/simulation/scenarios/base_scenario.py` | scenario step progression, task-context defaults, outcomes, progress, and dataclass serialization |
 | `tests/test_utils/test_config_loader.py` | `src/utils/config_loader.py` | default schemas, validation rules, constraints, and JSON/YAML save behavior |
 
@@ -115,7 +113,7 @@ Each level uploads a Markdown report as a GitHub Actions artifact (`clearance-le
 | Stop-on-failure behavior | `scripts/run_clearance_tests.py::main` | `--level N` runs levels `1..N` and stops after the first failed level. |
 | Report formats | `scripts/run_clearance_tests.py::write_report` | Supports `markdown` and `json`; workflow uses Markdown. |
 | Level 2 coverage threshold | `scripts/run_clearance_tests.py::LEVEL_STEPS[2]` | Uses `--cov-fail-under=60`, stricter than the `--cov-fail-under=40` used by CI and Level 1. |
-| Level 2 mypy exclusions | `mypy.ini` | Suppresses only external-service clients, legacy `training_session`, and the known `stay_alert_aide` context mismatch. |
+| Level 2 mypy exclusions | `mypy.ini` | Suppresses only external-service clients, legacy `training_session`, and the known `stay_alert_aide` context mismatch. Superseded world/NPC modules and their tests are preserved under `archive/legacy-world-engine/` and are not part of the active source tree. |
 
 ### Local reproduction
 

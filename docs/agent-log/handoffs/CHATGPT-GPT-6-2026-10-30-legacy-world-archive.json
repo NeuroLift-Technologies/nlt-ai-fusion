@@ -1,0 +1,27 @@
+{
+  "handoff_record": {
+    "session_id": "chatgpt-gpt6-2026-10-30-legacy-world-archive",
+    "agent_name": "ChatGPT GPT-6",
+    "date": "2026-10-30T00:00:00Z",
+    "repo": "NeuroLift-Technologies/nlt-ai-fusion",
+    "branch": "chore/archive-legacy-world-engine",
+    "work_completed": [
+      "Moved legacy Python ECS/grid world, NPC model, WebSocket client, demo, and coupled tests into archive/legacy-world-engine/python/.",
+      "Moved Cloudflare Durable Object world implementations and Wrangler entrypoints into the archive.",
+      "Moved browser World Engine prototype, old Sims viewer route/components, and world3d demo into the archive.",
+      "Moved old FastAPI /api/world router, schemas, and tests into the archive; removed route registration from the compatibility API.",
+      "Removed legacy physical-world exports from src/simulation/__init__.py while retaining SessionOrchestrator exports.",
+      "Updated README, Quick Start, architecture, implementation summary, backend docs, CI/mypy documentation, CLAUDE context, and active-thread tracking.",
+      "Added archive README, OTOI registration, intent log, and handoff record."
+    ],
+    "work_in_progress": ["Pull request review and automated CI verification", "Root package lockfile reconciliation for historical Wrangler development dependencies"],
+    "blockers": ["No local checkout or execution environment was available through the GitHub connector; Python tests, web build, mobile checks, and lockfile regeneration were not run."],
+    "decisions_made": ["Godot in nlt-world-engine remains the sole physical simulation authority.", "Fusion retains cognition, coaching, learning workflows, model adapters, readiness assessment, and Advocate fusion.", "Archived code is preserved for provenance but is not an active runtime or import surface."],
+    "decisions_pending": ["Review and approve the pull request before merge.", "Regenerate and validate the root npm lockfile in a local/CI-capable environment before removing unused Wrangler toolchain dependencies."],
+    "escalations": [],
+    "next_agent_notes": "Check Python CI, web build, type-check, and mobile workflows. Confirm no active imports reference archived modules. Do not merge without human approval.",
+    "files_modified": ["archive/legacy-world-engine/**", "README.md", "QUICKSTART.md", "CLAUDE.md", "docs/architecture.md", "docs/implementation_summary.md", "docs/active-threads.md", "docs/CI_HARNESS_README.md", "backend/README.md", "backend/app/main.py", "src/simulation/__init__.py", "mypy.ini", "docs/agent-log/registrations/CHATGPT-GPT-6-2026-10-30-legacy-world-archive.json", "docs/agent-log/intent/2026-10-30-chatgpt-legacy-world-archive.md", "docs/agent-log/handoffs/CHATGPT-GPT-6-2026-10-30-legacy-world-archive.json"],
+    "tests_run": [],
+    "tests_passing": false
+  }
+}
