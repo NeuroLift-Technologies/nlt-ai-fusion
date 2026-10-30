@@ -19,7 +19,6 @@
     ],
     "work_in_progress": [],
     "blockers": [],
-
     "decisions_made": [
       "Fixed the job in place (hoisted workspace install) instead of switching the job to an isolated mobile install. The isolated variant was built and verified green as well, but it requires editing .github/workflows/mobile.yml, which this agent's GitHub App credential cannot push (refusing to allow a GitHub App to create or update workflow without `workflows` permission). That alternative is documented in the PR description for a maintainer who prefers it.",
       "Pinned the React and ESLint majors at the workspace root rather than adding expo.install.exclude entries, because expo-doctor's duplicate-module check is a real signal and excluding it would hide the underlying two-major tree",
@@ -31,7 +30,7 @@
       "Whether apps/mobile should install in isolation in CI (`npm install --prefix .`, as apps/web already does) once a maintainer with workflow permissions can edit .github/workflows/mobile.yml"
     ],
     "escalations": [],
-    "next_agent_notes": "`Mobile — Type Check & Lint` should now pass end to end with the workflow unchanged. The two fragile spots are the root devDependency pins (eslint 9, react/react-dom 19) and the root react-native-screens override; dropping either reintroduces the ERR_PACKAGE_PATH_NOT_EXPORTED lint crash or an expo-doctor duplicate-module failure. If a future bump changes the SDK's expected screens or React version, update the root pin in the same commit. Dependabot PRs 153 and 154 were failing on this same job and should be re-run after this merges.",
+    "next_agent_notes": "`Mobile — Type Check & Lint` should now pass end to end with the workflow unchanged. The two fragile spots are the root devDependency pins (eslint 9, react/react-dom 19) and the root react-native-screens override; dropping either reintroduces the ERR_PACKAGE_PATH_NOT_EXPORTED lint crash or an expo-doctor duplicate-module failure. If a future bump changes the SDK's expected screens or React version, update the root pin in the same commit. Dependabot PRs 153 and 154 were failing on this same job and should be re-run after this merges. Unrelated pre-existing red check on main and on this PR: `Workers Builds: neurolift-ai-fusion` (Cloudflare) also fails on main HEAD 3d087dc, so it is not caused by this branch and was left out of scope.",
     "files_modified": [
       "package.json",
       "package-lock.json",
@@ -55,9 +54,10 @@
       "Post-fix, workspace-root install exactly as the job performs it (from apps/mobile): `npm install` exit 0, `npm run lint --max-warnings=0` exit 0, `npx tsc --noEmit` exit 0, `npx expo-doctor` 21/21 checks passed exit 0",
       "Resolved tree after fix: root eslint 9.39.5 + apps/web eslint 8.57.1; root react/react-dom 19.2.3 + apps/web react 18.3.1; apps/mobile typescript 6.0.3; expo 57.0.31, expo-router 57.0.29, react-native 0.86.3; single react-native-screens 4.26.2",
       "Alternative verified in parallel: isolated install (`npm install --prefix .`, `npm run lint --prefix . -- --max-warnings=0`, `npm exec --prefix . -- tsc --noEmit`, `npx expo-doctor`) also exits 0 for all four steps, including `npm ci --prefix .` for lockfile integrity",
-      "`bash .nltotoi/scripts/validate-governance.sh` -> 33 passed, 0 failed"
+      "`bash .nltotoi/scripts/validate-governance.sh` -> 33 passed, 0 failed",
+      "GitHub Actions on PR #155: job `check` (Mobile — Type Check & Lint) passes (31s) - was failing on main HEAD 3d087dc; Web build, Python lint/test, Clearance 1-2, CodeQL and Gitleaks all pass"
     ],
     "tests_passing": true,
-    "pr_url": "pending"
+    "pr_url": "https://github.com/NeuroLift-Technologies/nlt-ai-fusion/pull/155"
   }
 }
