@@ -33,7 +33,7 @@
       "Which governance version is canonical: config/global-toi-config.json says otoi 1.2.0, the contract documents say ORG-DEV-OTOI-1.0.3 (conflict C5)"
     ],
     "escalations": [],
-    "next_agent_notes": "Run spaces/ai-fusion/sync-to-hub.sh --out build/space-ai-fusion, then python -m pytest spaces/ai-fusion/tests/ -q, then sync-to-hub.sh --push divergent-tech/Ai-fusion with an authenticated hf CLI. After the first deploy, POST /v1/sessions/demo-run (with a grant) to confirm the runtime is live; expect /v1/fusion/attempt to answer success=false until sessions produce experience. /agent-loop/status answering 403 from outside is correct: the contract serves it on loopback only.",
+    "next_agent_notes": "Run spaces/ai-fusion/sync-to-hub.sh --out build/space-ai-fusion, then python -m pytest spaces/ai-fusion/tests/ -q, then sync-to-hub.sh --push divergent-tech/Ai-fusion with an authenticated hf CLI. After the first deploy, POST /v1/sessions/demo-run (with a grant) to confirm the runtime is live; expect /v1/fusion/attempt to answer success=false until sessions produce experience. /agent-loop/status answering 403 from outside is correct: the contract serves it on loopback only. NOTE: the runtime landed through PR #155, whose squash merge (d399e77) carried the Space commit because this branch was stacked on that PR branch; the Space sources on main are identical to the ones verified here.",
     "files_modified": [
       ".gitignore",
       "docs/active-threads.md",
@@ -66,9 +66,10 @@
       "POST /v1/fusion/readiness -> 200 overall_score=0.167 ready=false; POST /v1/fusion/attempt -> success=false Not ready",
       "POST /v1/sessions/demo-run -> 200 attempts=8 successes=1 success_rate=0.125 fusion_ready=false",
       "POST /agent-loop/perception tick=42 -> 200 intent verb=sit targetId=desk_1; unregistered agent -> 404",
-      "bash .nltotoi/scripts/validate-governance.sh -> 33 passed, 0 failed"
+      "bash .nltotoi/scripts/validate-governance.sh -> 33 passed, 0 failed",
+      "GitHub Actions on PR #156 before the rebase: 19-20 checks passed (Validate, Python lint/test, Clearance L1-L3, PGSA, Gitleaks x2, CodeQL, Hermes); only the pre-existing Workers Builds failure was red"
     ],
     "tests_passing": true,
-    "pr_url": "pending"
+    "pr_url": "https://github.com/NeuroLift-Technologies/nlt-ai-fusion/pull/155 (squash d399e77)"
   }
 }
