@@ -113,3 +113,6 @@ pgsa-reports/
 # Playwright test output
 output/playwright/
 .vercel
+
+# Local Python venv used to verify the AI-Fusion Space payload
+.venv-space/
