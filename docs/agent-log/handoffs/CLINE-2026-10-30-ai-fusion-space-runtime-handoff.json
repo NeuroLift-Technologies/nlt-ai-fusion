@@ -66,9 +66,10 @@
       "POST /v1/fusion/readiness -> 200 overall_score=0.167 ready=false; POST /v1/fusion/attempt -> success=false Not ready",
       "POST /v1/sessions/demo-run -> 200 attempts=8 successes=1 success_rate=0.125 fusion_ready=false",
       "POST /agent-loop/perception tick=42 -> 200 intent verb=sit targetId=desk_1; unregistered agent -> 404",
-      "bash .nltotoi/scripts/validate-governance.sh -> 33 passed, 0 failed"
+      "bash .nltotoi/scripts/validate-governance.sh -> 33 passed, 0 failed",
+      "GitHub Actions on PR #156: 20 checks pass (Validate governance, Python lint/test, Clearance L1-L3, PGSA provenance, both Gitleaks scans, CodeQL, Hermes); the only red check is the pre-existing Workers Builds failure that also fails on main HEAD"
     ],
     "tests_passing": true,
-    "pr_url": "pending"
+    "pr_url": "https://github.com/NeuroLift-Technologies/nlt-ai-fusion/pull/156"
   }
 }
