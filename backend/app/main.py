@@ -1,6 +1,6 @@
 """
-NeuroLift AI-Fusion — FastAPI Backend
-Exposes the simulation engine as a REST API consumed by the web and mobile apps.
+NeuroLift AI-Fusion — legacy FastAPI application surface
+Exposes cognitive Avatar, Aide, session, scenario, and fusion APIs. Physical world routes are owned by nlt-world-engine.
 """
 import os
 
@@ -12,7 +12,7 @@ from .routers import avatars, aides, sessions, fusion, scenarios, health, ai
 app = FastAPI(
     title="NeuroLift AI-Fusion API",
     description=(
-        "REST API for the NeuroLift simulation training environment. "
+        "REST API for the NeuroLift cognitive training platform. "
         "Manages Avatars, Aides, training sessions, and the Avatar→Advocate fusion process."
     ),
     version="1.0.0",

@@ -1,7 +1,7 @@
 """
-Tests for Scenario and ScenarioLibrary (src/simulation/environment/scenarios.py).
+Tests for Scenario and ScenarioLibrary (src/simulation/scenario_catalog.py).
 
-Covers the 13 pre-defined scenarios and the library query helpers.
+Covers the predefined cognitive scenarios and the library query helpers.
 """
 
 from datetime import timedelta
