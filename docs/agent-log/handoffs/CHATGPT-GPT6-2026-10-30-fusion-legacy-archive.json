@@ -1,0 +1,51 @@
+{
+  "handoff_record": {
+    "session_id": "chatgpt-gpt6-fusion-legacy-archive-20261030",
+    "agent_name": "ChatGPT GPT-6",
+    "date": "2026-10-30T11:42:42.905Z",
+    "repo": "NeuroLift-Technologies/nlt-ai-fusion",
+    "branch": "chore/fusion-archive-legacy-world-runtime-20261030",
+    "work_completed": [
+      "Prepared archival moves for the Python ECS/grid world, Cloudflare Durable Object simulation, old WebSocket/Three.js clients, browser prototype, legacy Python training scripts, old backend world router/schema, and simulation-only tests.",
+      "Retained the reusable cognitive scenario catalogue at src/simulation/scenario_catalog.py.",
+      "Prepared updates to README, architecture, quickstart, implementation status, Cloudflare notes, and agent instructions.",
+      "Removed the legacy /api/world router from backend/app/main.py.",
+      "Opened PR #152 for human review; PR is open and mergeable."
+    ],
+    "work_in_progress": [
+      "Human review and required CI verification for PR #152."
+    ],
+    "blockers": [
+      "No local pytest or application build was executed in this session; required PR checks and human approval remain outstanding."
+    ],
+    "decisions_made": [
+      "Godot 4.7.2 in nlt-world-engine remains the sole physical simulation authority.",
+      "Historical source is preserved under archive/legacy-world-engine/.",
+      "Scenario definitions remain active cognitive/task data and are moved to src/simulation/scenario_catalog.py.",
+      "No external Cloudflare/Vercel resource was modified or decommissioned."
+    ],
+    "decisions_pending": [
+      "Whether any already-deployed Cloudflare Worker should be separately decommissioned; this source archive does not change deployed resources."
+    ],
+    "escalations": [],
+    "next_agent_notes": "PR #152: https://github.com/NeuroLift-Technologies/nlt-ai-fusion/pull/152. Review the archive moves and documentation, run Python tests and application checks, search for remaining active imports of archived paths, and verify all required checks before merge. The Vercel status check was observed successful at PR creation; no local test suite was run.",
+    "files_modified": [
+      "README.md",
+      "CLAUDE.md",
+      "QUICKSTART.md",
+      "docs/architecture.md",
+      "docs/implementation_summary.md",
+      "docs/cloudflare/CLOUDFLARE_SETUP.md",
+      "docs/active-threads.md",
+      "backend/app/main.py",
+      "src/simulation/__init__.py",
+      "src/simulation/scenario_catalog.py",
+      "tests/test_simulation/test_scenarios.py"
+    ],
+    "tests_run": [
+      "Observed Vercel commit status: success",
+      "Local pytest/build commands not run in this session"
+    ],
+    "tests_passing": false
+  }
+}
