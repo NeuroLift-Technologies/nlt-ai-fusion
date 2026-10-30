@@ -1,0 +1,74 @@
+{
+  "handoff_record": {
+    "session_id": "cline-2026-10-30-ai-fusion-space-runtime",
+    "agent_name": "Cline",
+    "date": "2026-10-30",
+    "repo": "NeuroLift-Technologies/nlt-ai-fusion",
+    "branch": "cline/pm2vwg6t",
+    "work_completed": [
+      "Audited the whole repository before modifying anything and classified modules, packages, scripts, configuration and dependencies into the seven requested classes (docs/space-runtime/audit-and-classification.md). Nothing was deleted, archived or moved",
+      "Found that the fusion core (FusionEngine, ReadinessAssessor, ModelFusionEngine, state feed) has no HTTP surface anywhere: backend/app/routers/fusion.py fabricates readiness with random.uniform, and apps/api exposes hard-coded advocates",
+      "Built the Space runtime in spaces/ai-fusion/: Docker SDK image (python 3.11, non-root uid 1000, HEALTHCHECK), minimal 3-package requirements, lifespan startup/shutdown, non-secret configuration logging, and a payload assembler that copies the runtime subset from GitHub instead of forking src/",
+      "Exposed the cognitive core at stable versioned paths: /v1/fusion/{agents,readiness,attempt,state-feed}, /v1/sessions/{run,demo-run} reusing services.api.app.session_service, /v1/runtime/info, plus /health and /readyz with real dependency checks",
+      "Mounted src.fusion.agent_loop_http.create_app verbatim so the nlt.agent-loop.v1 seam keeps its tested behaviour (registry allow-list, one-in-flight 429, timeout quarantine 503, fail-closed 4xx)",
+      "Implemented ASFDK governance context carriage: agent identity, session, provenance, governance version and capabilities in headers, enforced by default with structured 403s; permissive mode is local-only and always labelled governance_enforced=false",
+      "Wrote spaces/ai-fusion/tests/test_runtime.py (20 integration tests) covering health, governance denials, fusion routes, session orchestration and the mounted contract seam",
+      "Documented architecture and boundaries, including eight architectural conflicts (three overlapping API surfaces, a latent broken import in apps/api, fabricated readiness in backend/app, unwired NPC module, TOI version drift, unqueued training pipeline, ungoverned contract seam, physics fields in the state feed) reported rather than silently resolved"
+    ],
+    "work_in_progress": [],
+    "blockers": [
+      "The Space cannot be deployed from this session: divergent-tech/Ai-fusion is still in NO_APP_FILE state and this agent's Hugging Face access is read-only (no HF tool registered for the connection, no HF_TOKEN in the environment). Payload assembly, local execution and verification are complete; the upload step needs either HF write tooling or a token with write scope"
+    ],
+    "decisions_made": [
+      "Chose a Docker Space over Gradio: the deliverable is a service interface for the API platform and Godot, and Gradio would introduce a UI framework the repository does not use",
+      "Deployed a runtime subset assembled at deploy time (src/, app/, services/api/app session service) rather than committing a second copy of src/ under spaces/, so the Space cannot drift from GitHub and no source is duplicated",
+      "Defaulted FUSION_AGENT_LOOP_MODEL to baseline so the Space boots with no checkpoint; gguf/transformers stay available and fail at startup when misconfigured, as the contract documentation requires",
+      "Left ModelFusionEngine and the training trigger unexposed: TrainingPipeline.run_async starts a bare thread with no queue or durable run state, so an HTTP trigger would misrepresent capability",
+      "Did not touch any file outside spaces/ai-fusion/ and docs/space-runtime/ except a .gitignore entry for the local verification venv"
+    ],
+    "decisions_pending": [
+      "Which of the three Python API surfaces (apps/api, backend/app, services/api) is canonical - Joshua to decide (conflict C1)",
+      "Whether to upload this payload to divergent-tech/Ai-fusion now, and with which hardware profile and volume wiring",
+      "Whether the state-feed contract should drop position/velocity (conflict C8) and whether the agent-loop seam should gain governance headers (conflict C7)",
+      "Which governance version is canonical: config/global-toi-config.json says otoi 1.2.0, the contract documents say ORG-DEV-OTOI-1.0.3 (conflict C5)"
+    ],
+    "escalations": [],
+    "next_agent_notes": "Run spaces/ai-fusion/sync-to-hub.sh --out build/space-ai-fusion, then python -m pytest spaces/ai-fusion/tests/ -q, then sync-to-hub.sh --push divergent-tech/Ai-fusion with an authenticated hf CLI. After the first deploy, POST /v1/sessions/demo-run (with a grant) to confirm the runtime is live; expect /v1/fusion/attempt to answer success=false until sessions produce experience. /agent-loop/status answering 403 from outside is correct: the contract serves it on loopback only.",
+    "files_modified": [
+      ".gitignore",
+      "docs/active-threads.md",
+      "docs/space-runtime/README.md",
+      "docs/space-runtime/audit-and-classification.md",
+      "docs/space-runtime/architecture-and-boundaries.md",
+      "docs/space-runtime/migration-and-deployment.md",
+      "docs/agent-log/handoffs/CLINE-2026-10-30-ai-fusion-space-runtime-handoff.json",
+      "spaces/ai-fusion/README.md",
+      "spaces/ai-fusion/Dockerfile",
+      "spaces/ai-fusion/requirements.txt",
+      "spaces/ai-fusion/.env.example",
+      "spaces/ai-fusion/sync-to-hub.sh",
+      "spaces/ai-fusion/app/__init__.py",
+      "spaces/ai-fusion/app/main.py",
+      "spaces/ai-fusion/app/settings.py",
+      "spaces/ai-fusion/app/governance.py",
+      "spaces/ai-fusion/app/fusion_routes.py",
+      "spaces/ai-fusion/app/session_routes.py",
+      "spaces/ai-fusion/app/health.py",
+      "spaces/ai-fusion/tests/__init__.py",
+      "spaces/ai-fusion/tests/test_runtime.py"
+    ],
+    "tests_run": [
+      "python -m pytest spaces/ai-fusion/tests/ -q -> 20 passed",
+      "python -m pytest tests/test_fusion/ -q -> 255 passed, 3 skipped (the mounted contract is unchanged)",
+      "Assembled payload executed standalone: uvicorn app.main:create_runtime_app --factory with PYTHONPATH set to the payload only",
+      "GET /health -> 200; GET /readyz -> 200 (model_kind=baseline, agents=[stay_alert_001], protocol=nlt.agent-loop.v1)",
+      "GET /v1/fusion/agents without a grant -> 403 governance_context_missing; with a grant -> 200 with the context echoed",
+      "POST /v1/fusion/readiness -> 200 overall_score=0.167 ready=false; POST /v1/fusion/attempt -> success=false Not ready",
+      "POST /v1/sessions/demo-run -> 200 attempts=8 successes=1 success_rate=0.125 fusion_ready=false",
+      "POST /agent-loop/perception tick=42 -> 200 intent verb=sit targetId=desk_1; unregistered agent -> 404",
+      "bash .nltotoi/scripts/validate-governance.sh -> 33 passed, 0 failed"
+    ],
+    "tests_passing": true,
+    "pr_url": "pending"
+  }
+}

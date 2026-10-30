@@ -1,7 +1,7 @@
 # Active Threads — neurolift-ai-fusion
 
 **Governance:** ORG-DEV-OTOI-1.0.3
-**Last updated:** 2026-10-30T21:45:00.000Z
+**Last updated:** 2026-10-30T22:05:00.000Z
 **Maintained by:** All active agents (update at session start and end)
 
 ---
@@ -28,6 +28,7 @@
 | TH-028 | AGENT-LOOP-003: give the agent-loop decision source state, goals and memory (`docs/specs/AGENT-LOOP-003-fusion-state-and-goals-brief.md`). F0-F4 merged (#132, #134, #135); exploring, reach guard, blocked targets (#136); acceptance tests (#137, Kilo); timeout + quarantine + model selection (#138); tier-3 ranking, demote-not-forbid (#139). Baseline passes 4a; no model met 4b (brief §12). Open: F5, model choice / decision time, the Qwen3-1.7B engine result | Joshua W. Dorsey, Sr. | Claude Code | ccr-100a7dbc-intpwq | 🟡 In Progress | 2026-10-29 |
 | TH-029 | Archive parallel Python/Cloudflare/browser World Engine implementations; preserve cognitive scenario catalogue; align active docs and remove legacy world API route ([PR #152](https://github.com/NeuroLift-Technologies/nlt-ai-fusion/pull/152)) | Joshua W. Dorsey, Sr. | ChatGPT GPT-6 | chore/fusion-archive-legacy-world-runtime-20261030 | 🟡 PR review pending | 2026-10-30T11:42:42.905Z |
 | TH-030 | Repair the red `Mobile — Type Check & Lint` job after the Expo SDK 57 upgrade ([#150](https://github.com/NeuroLift-Technologies/nlt-ai-fusion/pull/150)): root pins stop apps/web's eslint 8 / React 18 from being hoisted above apps/mobile's toolchain, ESLint flat config committed, 8 lint violations fixed, expo-doctor 21/21, SDK 57 config/schema alignment | Joshua W. Dorsey, Sr. | Cline | cline/pm2vwg6t | 🟡 [PR #155](https://github.com/NeuroLift-Technologies/nlt-ai-fusion/pull/155) — mobile job green, awaiting human review | 2026-10-30T21:45:00Z |
+| TH-031 | Prepare the AI-Fusion runtime for the Hugging Face Space `divergent-tech/Ai-fusion`: repo audit + 7-class module classification, Docker Space runtime in `spaces/ai-fusion/` (fusion + session + agent-loop surfaces, ASFDK capability gate, `/health` + `/readyz`), payload assembler, 20 integration tests; 8 architectural conflicts reported, deployment blocked on read-only Hub access | Joshua W. Dorsey, Sr. | Cline | cline/pm2vwg6t | 🟡 Runtime verified locally; Space upload pending Hub write access | 2026-10-30T22:05:00Z |
 
 
 
