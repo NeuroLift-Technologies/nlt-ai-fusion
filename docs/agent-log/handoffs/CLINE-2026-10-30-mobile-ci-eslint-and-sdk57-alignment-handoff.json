@@ -1,0 +1,63 @@
+{
+  "handoff_record": {
+    "session_id": "cline-2026-10-30-mobile-ci-repair",
+    "agent_name": "Cline",
+    "date": "2026-10-30",
+    "repo": "NeuroLift-Technologies/nlt-ai-fusion",
+    "branch": "cline/pm2vwg6t",
+    "work_completed": [
+      "Reproduced the red 'Mobile — Type Check & Lint' job locally: `expo lint` died with ERR_PACKAGE_PATH_NOT_EXPORTED (Package subpath './config' is not defined by exports in node_modules/eslint) because eslint-config-expo 57 flat config requires `eslint/config`, which only exists in ESLint >= 9, while the workspace root hoisted apps/web's eslint 8.57.1",
+      "Confirmed the mechanism in the dependency graph: node_modules/eslint-config-expo/flat/default.js:6 requires 'eslint/config', the package was hoisted to the workspace root, and the root eslint resolved to 8.57.1 (whose exports map has no './config'), so the ESLint 9 copy that `expo lint` proposed never reached that resolution path",
+      "Diagnosed the rest of the same job: `expo lint` had no committed config and no eslint dependency, so it bootstrapped an ESLint install at run time, and expo-doctor separately failed on two React majors in one tree plus a duplicate react-native-screens",
+      "Pinned eslint 9 and react/react-dom 19 in the workspace root devDependencies so the hoisted toolchain matches what apps/mobile needs, leaving apps/web's eslint 8 / react 18 nested for its own isolated job",
+      "Added a root `overrides` entry for react-native-screens (~4.26.0, the SDK 57 expected range) and regenerated the root lockfile from a clean resolution, collapsing the second 4.30.0 copy npm kept under expo-router",
+      "Declared eslint ^9 and eslint-config-expo ~57.0.2 as apps/mobile devDependencies and committed apps/mobile/eslint.config.js so `expo lint` no longer generates lint rules at CI time",
+      "Fixed the 8 lint violations the restored config surfaced: removed redundant synchronous setLoading(true) from mount loaders (aides, avatars, fusion, sessions), moved the dashboard and session mount fetches into promise callbacks with an unmount guard, and replaced raw double quotes with entities on the index screen",
+      "Aligned apps/mobile with SDK 57 expectations: expo-splash-screen ~57.0.10, typescript ~6.0.3, splash config moved into the expo-splash-screen plugin, newArchEnabled and android.edgeToEdgeEnabled removed (both are always-on now and rejected by the SDK 57 schema)",
+      "Regenerated apps/mobile/package-lock.json and the workspace root package-lock.json",
+      "Documented the root pins and the committed ESLint config in apps/mobile/README.md, which also still advertised Expo SDK 52"
+    ],
+    "work_in_progress": [],
+    "blockers": [],
+    "decisions_made": [
+      "Fixed the job in place (hoisted workspace install) instead of switching the job to an isolated mobile install. The isolated variant was built and verified green as well, but it requires editing .github/workflows/mobile.yml, which this agent's GitHub App credential cannot push (refusing to allow a GitHub App to create or update workflow without `workflows` permission). That alternative is documented in the PR description for a maintainer who prefers it.",
+      "Pinned the React and ESLint majors at the workspace root rather than adding expo.install.exclude entries, because expo-doctor's duplicate-module check is a real signal and excluding it would hide the underlying two-major tree",
+      "Bumped typescript to ~6.0.3 rather than excluding it from Expo's version validation, because tsc --noEmit passes on 6.0.3",
+      "Kept scope to the mobile CI job: no changes to apps/web, apps/api, or Python code, and no changes under .github/workflows"
+    ],
+    "decisions_pending": [
+      "Whether the monorepo should converge on a single ESLint major (apps/web remains on eslint 8 with a legacy .eslintrc.json) instead of relying on root-level major pins — Joshua to decide",
+      "Whether apps/mobile should install in isolation in CI (`npm install --prefix .`, as apps/web already does) once a maintainer with workflow permissions can edit .github/workflows/mobile.yml"
+    ],
+    "escalations": [],
+    "next_agent_notes": "`Mobile — Type Check & Lint` should now pass end to end with the workflow unchanged. The two fragile spots are the root devDependency pins (eslint 9, react/react-dom 19) and the root react-native-screens override; dropping either reintroduces the ERR_PACKAGE_PATH_NOT_EXPORTED lint crash or an expo-doctor duplicate-module failure. If a future bump changes the SDK's expected screens or React version, update the root pin in the same commit. Dependabot PRs 153 and 154 were failing on this same job and should be re-run after this merges. Unrelated pre-existing red check on main and on this PR: `Workers Builds: neurolift-ai-fusion` (Cloudflare) also fails on main HEAD 3d087dc, so it is not caused by this branch and was left out of scope.",
+    "files_modified": [
+      "package.json",
+      "package-lock.json",
+      "apps/mobile/app.json",
+      "apps/mobile/eslint.config.js",
+      "apps/mobile/package.json",
+      "apps/mobile/package-lock.json",
+      "apps/mobile/README.md",
+      "apps/mobile/app/(tabs)/aides.tsx",
+      "apps/mobile/app/(tabs)/avatars.tsx",
+      "apps/mobile/app/(tabs)/dashboard.tsx",
+      "apps/mobile/app/(tabs)/fusion.tsx",
+      "apps/mobile/app/(tabs)/index.tsx",
+      "apps/mobile/app/(tabs)/session.tsx",
+      "apps/mobile/app/(tabs)/sessions.tsx",
+      "docs/active-threads.md",
+      "docs/agent-log/handoffs/CLINE-2026-10-30-mobile-ci-eslint-and-sdk57-alignment-handoff.json"
+    ],
+    "tests_run": [
+      "Pre-fix reproduction: `npm run lint --workspace=apps/mobile` -> ERR_PACKAGE_PATH_NOT_EXPORTED './config' (exit 2), identical to CI run 41128753272 / job 124313945774",
+      "Post-fix, workspace-root install exactly as the job performs it (from apps/mobile): `npm install` exit 0, `npm run lint --max-warnings=0` exit 0, `npx tsc --noEmit` exit 0, `npx expo-doctor` 21/21 checks passed exit 0",
+      "Resolved tree after fix: root eslint 9.39.5 + apps/web eslint 8.57.1; root react/react-dom 19.2.3 + apps/web react 18.3.1; apps/mobile typescript 6.0.3; expo 57.0.31, expo-router 57.0.29, react-native 0.86.3; single react-native-screens 4.26.2",
+      "Alternative verified in parallel: isolated install (`npm install --prefix .`, `npm run lint --prefix . -- --max-warnings=0`, `npm exec --prefix . -- tsc --noEmit`, `npx expo-doctor`) also exits 0 for all four steps, including `npm ci --prefix .` for lockfile integrity",
+      "`bash .nltotoi/scripts/validate-governance.sh` -> 33 passed, 0 failed",
+      "GitHub Actions on PR #155: job `check` (Mobile — Type Check & Lint) passes (31s) - was failing on main HEAD 3d087dc; Web build, Python lint/test, Clearance 1-2, CodeQL and Gitleaks all pass"
+    ],
+    "tests_passing": true,
+    "pr_url": "https://github.com/NeuroLift-Technologies/nlt-ai-fusion/pull/155"
+  }
+}

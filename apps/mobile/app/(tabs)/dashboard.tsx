@@ -36,8 +36,28 @@ export default function DashboardScreen() {
     }
   };
 
+  // Resolve the mount fetch in promise callbacks instead of calling load()
+  // directly in the effect body (react-hooks/set-state-in-effect), and ignore
+  // results that arrive after unmount.
   useEffect(() => {
-    load().finally(() => setLoading(false));
+    let active = true;
+    api.sessions
+      .list()
+      .then((data) => {
+        if (!active) return;
+        setSessions(data);
+        setError(null);
+      })
+      .catch((e: unknown) => {
+        if (!active) return;
+        setError(e instanceof Error ? e.message : "Failed to load");
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
   }, []);
 
   const onRefresh = async () => {

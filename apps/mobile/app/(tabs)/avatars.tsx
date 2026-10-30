@@ -18,8 +18,9 @@ export default function AvatarsScreen() {
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
 
+  // `loading` already starts true, so the mount fetch does not need to set it
+  // again synchronously inside the effect (react-hooks/set-state-in-effect).
   const load = () => {
-    setLoading(true);
     Promise.all([avatarsApi.list(), avatarsApi.traits()])
       .then(([avs, ts]) => { setAvatars(avs); setTraits(ts); })
       .finally(() => setLoading(false));

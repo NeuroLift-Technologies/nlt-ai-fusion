@@ -1,0 +1,9 @@
+# Minimum complete runtime dependency set for the AI-Fusion Space.
+#
+# Deliberately smaller than the repository's root requirements.txt: no pandas,
+# matplotlib, seaborn, sphinx, black/isort/flake8 or pytest-xdist, because the
+# runtime never imports them. Keep this list in step with what
+# `python -c "import app.main"` actually needs.
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0
+pydantic>=2.0.0
