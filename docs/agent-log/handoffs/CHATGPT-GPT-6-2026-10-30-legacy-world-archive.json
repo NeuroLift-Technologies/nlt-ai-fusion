@@ -14,13 +14,44 @@
       "Updated README, Quick Start, architecture, implementation summary, backend docs, CI/mypy documentation, CLAUDE context, and active-thread tracking.",
       "Added archive README, OTOI registration, intent log, and handoff record."
     ],
-    "work_in_progress": ["Pull request review and automated CI verification", "Root package lockfile reconciliation for historical Wrangler development dependencies"],
-    "blockers": ["No local checkout or execution environment was available through the GitHub connector; Python tests, web build, mobile checks, and lockfile regeneration were not run."],
-    "decisions_made": ["Godot in nlt-world-engine remains the sole physical simulation authority.", "Fusion retains cognition, coaching, learning workflows, model adapters, readiness assessment, and Advocate fusion.", "Archived code is preserved for provenance but is not an active runtime or import surface."],
-    "decisions_pending": ["Review and approve the pull request before merge.", "Regenerate and validate the root npm lockfile in a local/CI-capable environment before removing unused Wrangler toolchain dependencies."],
+    "work_in_progress": [
+      "Pull request review and automated CI verification",
+      "Root package lockfile reconciliation for historical Wrangler development dependencies",
+      "Cloudflare Workers Git integration reported a build for the legacy neurolift-ai-fusion Worker; human decision required before merge."
+    ],
+    "blockers": [
+      "No local checkout or execution environment was available through the GitHub connector; Python tests, web build, mobile checks, and lockfile regeneration were not run.",
+      "The existing Cloudflare Workers Git integration may still be configured to build/deploy the archived root Worker. No Cloudflare account or deployment settings were changed. Joshua must decide whether to retire that integration or preserve a compatible deployment entrypoint before merge."
+    ],
+    "decisions_made": [
+      "Godot in nlt-world-engine remains the sole physical simulation authority.",
+      "Fusion retains cognition, coaching, learning workflows, model adapters, readiness assessment, and Advocate fusion.",
+      "Archived code is preserved for provenance but is not an active runtime or import surface."
+    ],
+    "decisions_pending": [
+      "Review and approve the pull request before merge.",
+      "Regenerate and validate the root npm lockfile in a local/CI-capable environment before removing unused Wrangler toolchain dependencies.",
+      "Confirm disposition of the Cloudflare Workers Git integration for the archived legacy Worker."
+    ],
     "escalations": [],
-    "next_agent_notes": "Check Python CI, web build, type-check, and mobile workflows. Confirm no active imports reference archived modules. Do not merge without human approval.",
-    "files_modified": ["archive/legacy-world-engine/**", "README.md", "QUICKSTART.md", "CLAUDE.md", "docs/architecture.md", "docs/implementation_summary.md", "docs/active-threads.md", "docs/CI_HARNESS_README.md", "backend/README.md", "backend/app/main.py", "src/simulation/__init__.py", "mypy.ini", "docs/agent-log/registrations/CHATGPT-GPT-6-2026-10-30-legacy-world-archive.json", "docs/agent-log/intent/2026-10-30-chatgpt-legacy-world-archive.md", "docs/agent-log/handoffs/CHATGPT-GPT-6-2026-10-30-legacy-world-archive.json"],
+    "next_agent_notes": "PR #151 is open. Review automated checks and confirm the Cloudflare Workers Git integration disposition before merge. Do not merge until Joshua approves that deployment decision. Root Wrangler dependency lockfile cleanup remains separate.",
+    "files_modified": [
+      "archive/legacy-world-engine/**",
+      "README.md",
+      "QUICKSTART.md",
+      "CLAUDE.md",
+      "docs/architecture.md",
+      "docs/implementation_summary.md",
+      "docs/active-threads.md",
+      "docs/CI_HARNESS_README.md",
+      "backend/README.md",
+      "backend/app/main.py",
+      "src/simulation/__init__.py",
+      "mypy.ini",
+      "docs/agent-log/registrations/CHATGPT-GPT-6-2026-10-30-legacy-world-archive.json",
+      "docs/agent-log/intent/2026-10-30-chatgpt-legacy-world-archive.md",
+      "docs/agent-log/handoffs/CHATGPT-GPT-6-2026-10-30-legacy-world-archive.json"
+    ],
     "tests_run": [],
     "tests_passing": false
   }
