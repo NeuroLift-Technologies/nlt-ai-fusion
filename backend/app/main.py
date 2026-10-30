@@ -12,7 +12,7 @@ from .routers import avatars, aides, sessions, fusion, scenarios, health, ai
 app = FastAPI(
     title="NeuroLift AI-Fusion API",
     description=(
-        "REST API for the NeuroLift simulation training environment. "
+        "REST API for the NeuroLift cognitive training environment. "
         "Manages Avatars, Aides, training sessions, and the Avatar→Advocate fusion process."
     ),
     version="1.0.0",

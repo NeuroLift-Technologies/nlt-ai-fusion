@@ -24,7 +24,7 @@ The system enables:
 
 For the current layout, browse the repo or run `git ls-files | head -50`. The key directories:
 
-- `apps/api/` — FastAPI backend (Python 3.11+, wraps the simulation engine)
+- `apps/api/` — FastAPI backend (Python 3.11+, exposes cognitive training and model APIs)
 - `apps/web/` — Next.js 14 web app (TypeScript + Tailwind)
 - `apps/mobile/` — Expo (React Native) iOS & Android
 - `src/` — Python cognitive and learning logic: `avatars/`, `aides/`, `core/`, `simulation/session_orchestrator.py`, `simulation/scenarios/`, `fusion/`, `database/`

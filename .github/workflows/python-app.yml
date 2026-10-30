@@ -1,4 +1,4 @@
-name: Python — Simulation Engine
+name: Python — Cognitive Layer
 
 on:
   push:
@@ -36,7 +36,7 @@ jobs:
           python-version: "3.11"
           cache: "pip"
 
-      - name: Install simulation engine dependencies
+      - name: Install cognitive layer dependencies
         run: |
           python -m pip install --upgrade pip
           pip install flake8 pytest pytest-cov
@@ -48,7 +48,7 @@ jobs:
       - name: Install backend dependencies
         run: pip install -r backend/requirements.txt
 
-      - name: Lint — simulation engine
+      - name: Lint — cognitive layer
         run: |
           flake8 src/ --count --select=E9,F63,F7,F82 --show-source --statistics
           flake8 src/ --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
@@ -63,7 +63,7 @@ jobs:
           flake8 apps/api/ --count --select=E9,F63,F7,F82 --show-source --statistics
           flake8 apps/api/ --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
 
-      - name: Test simulation engine
+      - name: Test cognitive layer
         run: |
           pytest --tb=short \
             --cov=src \
